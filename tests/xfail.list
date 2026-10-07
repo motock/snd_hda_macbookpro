@@ -15,3 +15,23 @@
 # tests that are no longer broken.
 #
 # This file is intentionally empty: there are no known failures today.
+#
+# ---------------------------------------------------------------------------
+# test_hooks_apply.sh -- the two pre-6.17 hooks do not apply cleanly to the
+# pinned old tree (linux-6.12.112).  They still apply (exit 0, no .rej), but
+# patch reports an offset, which means the hook's context no longer lines up
+# with the kernel source it patches:
+#
+#   patch_patch_cs8409.c.diff   offset 170 lines (hunks 1-3)
+#   patch_patch_cs8409.h.diff   offset 3 lines   (hunks 2-4)
+#
+# The pre-6.17 installer's implemented range tops out at 5.19 (see
+# install.cirrus.driver.pre617.sh:233-237), so 6.12 is already past what it
+# claims to support and the installer prints "Kernel version later than
+# implemented version - there may be build problems" for it.  The offsets are
+# therefore expected, but they are still drift: the hooks are pinned to an
+# older kernel_sources/ snapshot.
+#
+# Fixing the hooks is a separate story.  Until then this test fails on purpose
+# so the drift stays visible instead of being papered over.
+test_hooks_apply.sh
