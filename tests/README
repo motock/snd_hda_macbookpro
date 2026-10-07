@@ -1,4 +1,127 @@
 
+# tests/ -- automated test suite
+
+## Running the tests
+
+From the repository root:
+
+```sh
+make test
+```
+
+which is a thin wrapper around the runner itself:
+
+```sh
+bash tests/run.sh
+```
+
+The runner prints one line per test file and a summary:
+
+```
+PASS test_runner_selfcheck.sh
+passed=1 failed=0 skipped=0 xfail=0
+```
+
+`make test` exits non-zero if any test failed, so it is safe to use as a CI
+gate. The runner needs nothing but bash -- no build, no kernel headers, no
+hardware -- so it runs on any machine, including macOS.
+
+## Writing a test
+
+Create a file named `tests/test_<something>.sh`. The runner discovers every
+`tests/test_*.sh` automatically; there is no list to register in.
+
+```sh
+#!/usr/bin/env bash
+set -u
+
+. "$(dirname "$0")/lib/assert.sh"
+
+assert_eq "$(echo hi)" "hi" "echo prints its argument"
+assert_contains "$(uname -s)" "Darwin" "running on macOS"
+
+finish
+```
+
+Rules:
+
+* Source `tests/lib/assert.sh` for the assertion helpers.
+* Call `finish` as the **last** statement. It exits 1 if any assertion failed
+  and 0 otherwise.
+* Assertions never abort the test: a failure is printed to stderr and
+  recorded, so one run reports every problem in the file.
+* Use `make_tmpdir` for scratch space. The directory is removed automatically
+  when the test process exits, even if the test fails.
+
+### Exit-code convention
+
+| Exit code | Meaning | Runner reports |
+| --------- | ------- | -------------- |
+| `0`       | pass    | `PASS`         |
+| `1`       | fail    | `FAIL`         |
+| `77`      | skip    | `SKIP`         |
+
+Any other exit status (including death by signal) is treated as a failure.
+`skip "reason"` prints the reason and exits 77 for you.
+
+### Assertion helpers
+
+| Helper | Passes when |
+| ------ | ----------- |
+| `assert_eq expected actual msg` | the two values are equal |
+| `assert_ne unexpected actual msg` | the two values differ |
+| `assert_contains haystack needle msg` | `haystack` contains `needle` |
+| `assert_not_contains haystack needle msg` | `haystack` does not contain `needle` |
+| `assert_file_exists path msg` | `path` exists |
+| `assert_exit_code expected cmd...` | `cmd` exits with `expected` |
+| `assert_exit_nonzero cmd...` | `cmd` exits non-zero |
+| `skip msg` | never -- it exits 77 |
+
+Failures are printed as:
+
+```
+FAIL: <msg> (expected <...>, got <...>)
+```
+
+## Expected failures: `tests/xfail.list`
+
+`tests/xfail.list` lists, one basename per line, tests that are known to fail.
+Blank lines and `#` comments (whole-line or trailing) are ignored.
+
+* A listed test that **fails** is reported `XFAIL` and counts as a pass.
+* A listed test that **passes** is reported `XPASS` and **fails the whole
+  run**.
+
+The `XPASS` rule is deliberate. It forces whoever fixes the underlying bug to
+delete the entry, so the list cannot silently rot into a list of tests that
+are no longer broken.
+
+The file is intentionally empty today: there are no known failures.
+
+## Environment variables
+
+| Variable | Purpose |
+| -------- | ------- |
+| `HDA_TESTS_DIR` | Directory to discover `test_*.sh` in. Defaults to `tests/`. Used by the self-check to run the runner against scratch suites. |
+| `HDA_XFAIL_FILE` | Path to the expected-failure list. Defaults to `$HDA_TESTS_DIR/xfail.list`. |
+| `HDA_TEST_CACHE` | Reserved for the kernel cache story. The runner passes it through to test files untouched; nothing reads it yet. |
+
+## The self-check
+
+`tests/test_runner_selfcheck.sh` tests the harness itself: every assertion
+helper gets a positive and a negative case, and the runner's `PASS` / `FAIL` /
+`SKIP` / `XFAIL` / `XPASS` reporting and exit status are exercised against
+throwaway suites in temporary directories. Run it directly while working on
+the harness:
+
+```sh
+bash tests/test_runner_selfcheck.sh
+```
+
+## Manual hardware tests
+
+The rest of this directory is manual test material for real hardware.
+
 Test waveforms for speakers
 
 StereoTest32_reduced_m24dB.wav is reduced volume level for testing via the direct hardware device

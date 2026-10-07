@@ -1,0 +1,3 @@
+{
+  "test_cmd": ["bash", "tests/run.sh"]
+}
