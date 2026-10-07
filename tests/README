@@ -140,3 +140,53 @@ NOTA BENE - do NOT use -D hw:0,0 with StereoTest32.wav
 
 waveform provided by milan475
 
+## Kernel source cache
+
+Some tests need a real kernel source tree to patch or inspect. Downloading and
+unpacking a kernel in every test would be slow and would hit the network, so
+`tests/lib/kernel_cache.sh` keeps a pinned, checksum-verified cache **outside
+the repository**.
+
+Source the library and ask it for a tree:
+
+```sh
+. "$(dirname "$0")/lib/kernel_cache.sh"
+
+tree=$(kernel_tree_for new) || exit $?   # echoes the pristine tree path
+```
+
+| Function | Behaviour |
+| -------- | --------- |
+| `kernel_tree_for new\|old` | Echoes the path of the pristine extracted tree and returns `0`. |
+| `kernel_tree_copy new\|old destdir` | Copies the pristine tree to `destdir` (created if missing) so a test can mutate it. |
+
+Exit codes:
+
+| Code | Meaning |
+| ---- | ------- |
+| `0`  | success -- the tree path is on stdout |
+| `1`  | hard error (bad arguments, checksum mismatch, unreadable pins) |
+| `77` | the tree is not cached and the network is down -- the caller should `skip` |
+
+`77` is the only "soft" failure: it means the tree is simply unavailable, so
+the test should skip rather than fail. A checksum mismatch is deliberately a
+hard `1`, never a skip, and the offending file is deleted from the cache.
+
+`tests/kernel-pins.conf` holds the two pins -- `PIN_NEW_VERSION` (6.17 or
+newer) and `PIN_OLD_VERSION` (older than 6.17) -- each with the exact
+`linux-<version>.tar.xz` tarball name the installers fetch and its SHA-256
+copied from kernel.org's `sha256sums.asc`. The tarball is verified with
+`sha256sum` (or `shasum -a 256` on macOS) before anything is extracted, and
+only the subtrees the installers use are unpacked: `sound/pci/hda` for the old
+pin, plus `sound/hda` for the new pin.
+
+The cache root defaults to
+`${XDG_CACHE_HOME:-$HOME/.cache}/snd_hda_macbookpro-tests` and can be
+overridden with `HDA_TEST_CACHE`. It is always outside the repository, so a
+test run never dirties the working tree. `HDA_KERNEL_PINS` overrides the pins
+file and `HDA_KERNEL_MIRROR` the download directory URL.
+
+**Rule:** a test that mutates a tree must mutate a `kernel_tree_copy`, never
+the pristine cached tree. The cached tree is shared by every test in the run,
+so writing to it corrupts the cache for everyone.
+
