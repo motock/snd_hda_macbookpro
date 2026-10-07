@@ -24,12 +24,10 @@
 . "$(dirname "$0")/lib/assert.sh"
 cd "$(cd "$(dirname "$0")/.." && pwd)" || exit 1
 
-# Headers whose SPDX story has not landed yet (batches 2 and 3).  The story
-# that adds the SPDX line to one of these files must also remove it from this
-# array, otherwise R4 reports it as stale.
+# Headers whose SPDX story has not landed yet (batch 3).  The story that adds
+# the SPDX line to one of these files must also remove it from this array,
+# otherwise R4 reports it as stale.
 KNOWN_MISSING=(
-  patch_cirrus/patch_cirrus_hda_generic_copy.h
-  patch_cirrus/patch_cirrus_new84.h
   patch_cirrus/patch_cirrus_real84.h
   patch_cirrus/patch_cirrus_real84_i2c.h
 )

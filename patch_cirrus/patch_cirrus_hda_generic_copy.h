@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 /* playback mute control with the software mute bit check */
 static void sync_auto_mute_bits(struct snd_kcontrol *kcontrol,

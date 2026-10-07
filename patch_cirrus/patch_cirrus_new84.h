@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 
 // as of kernel 6.8 we need prototype definitions for non-static functions
