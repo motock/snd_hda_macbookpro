@@ -23,3 +23,8 @@ clean:
 install:
 	make INSTALL_MOD_DIR=updates -C $(KERNELBUILD) M=$(shell pwd)/build/hda CONFIG_MODULE_SIG_ALL=n modules_install
 	depmod -a
+
+test:
+	bash tests/run.sh
+
+.PHONY: clean test

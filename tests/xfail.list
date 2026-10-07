@@ -1,0 +1,17 @@
+# tests/xfail.list -- expected failures.
+#
+# One test file basename per line, e.g.
+#
+#     test_kernel_cache.sh
+#
+# Blank lines and `#` comments (whole-line or trailing) are ignored.
+#
+# Semantics enforced by tests/run.sh:
+#   * A listed test that FAILS is reported XFAIL and counts as a pass.
+#   * A listed test that PASSES is reported XPASS and fails the whole run.
+#
+# The XPASS rule is deliberate: it forces whoever fixes the underlying bug to
+# delete the entry here, so this list can never silently rot into a list of
+# tests that are no longer broken.
+#
+# This file is intentionally empty: there are no known failures today.
