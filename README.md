@@ -94,6 +94,29 @@ cd snd_hda_macbookpro/
 reboot
 ```
 
+**building for a specific kernel (KERNELDIR / KERNELRELEASE)**
+
+The top level `Makefile` builds and installs for the running kernel by default.
+To build for another kernel, pass one of these variables to `make`:
+
+```
+# build/install for the kernel named by its release (recommended)
+sudo make install KERNELRELEASE=6.8.0-45-generic
+
+# or point at the kernel's modules directory directly
+sudo make install KERNELDIR=/lib/modules/6.8.0-45-generic
+```
+
+`KERNELRELEASE` selects `/lib/modules/$(KERNELRELEASE)` and wins if both are
+given.  If only `KERNELDIR` is overridden, the release is taken from the last
+component of that path, so `KERNELDIR=/lib/modules/6.8.0-45-generic` behaves
+like `KERNELRELEASE=6.8.0-45-generic`.  With neither set, the running kernel
+(`uname -r`) is used.
+
+`make install` runs `depmod -a` against the kernel it built for, so the module
+dependency metadata lands in the right `/lib/modules/<release>` tree.  With
+neither variable set it keeps the historical bare `depmod -a` (current kernel).
+
 **Deleting driver**
 ```
 # Check your kernel version
