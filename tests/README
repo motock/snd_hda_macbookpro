@@ -190,3 +190,82 @@ file and `HDA_KERNEL_MIRROR` the download directory URL.
 the pristine cached tree. The cached tree is shared by every test in the run,
 so writing to it corrupts the cache for everyone.
 
+## Hook application: `tests/test_hooks_apply.sh`
+
+Every `*.diff` hook in the repository root must apply cleanly to the pinned
+kernel trees. A hook that applies with **fuzz** or **offset**, or that leaves a
+`*.rej` behind, has drifted away from the kernel source it patches and will
+eventually stop applying altogether.
+
+The test reproduces the two installers' copy-and-patch sequences step for step,
+using the pinned trees from `tests/lib/kernel_cache.sh` instead of downloading
+and unpacking a kernel:
+
+| Sequence | Installer | Kernel | `patch` args |
+| -------- | --------- | ------ | ------------ |
+| `new` | `install.cirrus.driver.sh` lines 213-299 | `>= 6.17` | `-p1` |
+| `old` | `install.cirrus.driver.pre617.sh` lines 228-303 | `< 6.17` | `-p2` |
+
+For each hook it runs `patch --dry-run` first -- which names the diff when it
+cannot apply -- and then for real, so the next hook is checked against the
+patched result. Each hook must exit `0`, leave no `*.rej`/`*.orig` behind, and
+report neither `fuzz` nor `offset`.
+
+Two deliberate deviations from the installers, both to make failures visible:
+
+* the installers' `patch -b` is dropped (and `--no-backup-if-mismatch` added),
+  so any `*.orig` in the tree is evidence of a bad apply rather than expected
+  noise. The only `*.orig` files tolerated are the `Makefile` backups the
+  installers create themselves with `mv`;
+* `--verbose` is added, because `--batch` also silences the
+  `Hunk #N succeeded at L (offset N lines)` / `with fuzz N` messages that the
+  fuzz and offset checks look for.
+
+### Coverage: no orphan hooks
+
+The test also asserts that every root `*.diff` is applied by one of the two
+sequences, or is listed in the test's `KNOWN_UNUSED` array with a justification.
+That is what catches a hook no installer reaches any more. Today the only entry
+is `patch_patch_cirrus.c.diff`, which only the pre-6.17 installer's
+`major_version -eq 5 -a minor_version -lt 13` branch uses.
+
+`patches/*.diff` is a separate directory of Ubuntu/mainline variant hooks,
+selected by the installers' `iscurrent` branches, and is deliberately out of
+scope for this test.
+
+### Negative case
+
+The test corrupts a copy of one hook in a scratch directory -- the repository is
+never modified -- and asserts that the check rejects it and names the file. That
+case was written first, and it is what stops this file from passing because it
+checks nothing. The test also asserts that the number of hooks applied is at
+least the number of root `*.diff` files in play, so a run that applies nothing
+cannot pass.
+
+### Known drift
+
+The two pre-6.17 hooks apply to the pinned old tree (`linux-6.12.112`) with an
+offset, so this test currently fails on purpose and is listed in
+`tests/xfail.list`. See that file for the details; fixing the hooks is a
+separate story.
+
+### Running it
+
+```sh
+bash tests/test_hooks_apply.sh   # 0 pass, 1 fail, 77 skip
+```
+
+The test skips (`77`) when a pinned tree is not cached and cannot be downloaded,
+so it is safe to run offline. It needs `patch`, `tar` and `awk`; nothing is
+written inside the repository.
+
+### `tests/xfail.list` now has two entries
+
+`test_hooks_apply.sh` (above) and `test_spdx_batch2.sh`. The second one is
+HDA-41's test, not this story's, and it is listed because its B6 check derives
+the pre-story tree from the commit that *introduced the test file* -- the same
+commit that made the SPDX edit -- so its "must add exactly one line" assertion
+can never hold. The SPDX lines themselves are present and correct. See the
+comment in `tests/xfail.list` for the full diagnosis; fixing B6 belongs to
+HDA-41. Listing it here keeps `make test` honest: the failure is named and
+counted as XFAIL rather than being hidden or silently ignored.
