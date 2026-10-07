@@ -34,6 +34,14 @@ KNOWN_MISSING=(
   patch_cirrus/patch_cirrus_real84_i2c.h
 )
 
+# This story's deliverables (batch 1).  They are checked strictly, with no
+# exemption, so that adding a name to KNOWN_MISSING cannot make them pass.
+REQUIRED=(
+  patch_cirrus/cirrus_apple.h
+  patch_cirrus/patch_cirrus_apple.h
+  patch_cirrus/patch_cirrus_boot84.h
+)
+
 # ---------------------------------------------------------------------------
 # checker
 # ---------------------------------------------------------------------------
@@ -157,7 +165,9 @@ if [ -z "$HDA_PP" ]; then
   printf 'SKIP: no C preprocessor (cc/gcc/clang) found; R5 not run\n' >&2
 else
   # Empty stubs for every <...>/"..." include used by the headers, so that
-  # preprocessing succeeds without a kernel source tree.
+  # preprocessing succeeds without a kernel source tree.  The forced include
+  # supplies the LINUX_VERSION_CODE / KERNEL_VERSION macros that some headers
+  # use without including linux/version.h themselves.
   STUBS=$(make_tmpdir)/stubs
   mkdir -p "$STUBS"
   for _inc in $(grep -h -o '#include[[:space:]]*[<"][^<">]*[>"]' patch_cirrus/*.h \
@@ -166,11 +176,14 @@ else
     mkdir -p "$STUBS/$(dirname "$_inc")"
     : > "$STUBS/$_inc"
   done
+  printf '#define LINUX_VERSION_CODE 332032\n' > "$STUBS/force.h"
+  printf '#define KERNEL_VERSION(a,b,c) (((a) << 16) + ((b) << 8) + (c))\n' >> "$STUBS/force.h"
 
   # pp_to <outfile> <infile> -- normalised preprocessed text; fails if the
   # preprocessor fails.
   pp_to() {
-    "$HDA_PP" -E -P -x c -I patch_cirrus -I "$STUBS" "$2" > "$1" 2>/dev/null || return 1
+    "$HDA_PP" -E -P -x c -I patch_cirrus -I "$STUBS" -include "$STUBS/force.h" \
+      "$2" > "$1" 2>/dev/null || return 1
     sed -e 's/[[:space:]]*$//' -e '/^[[:space:]]*$/d' "$1" > "$1.n"
     mv "$1.n" "$1"
   }
