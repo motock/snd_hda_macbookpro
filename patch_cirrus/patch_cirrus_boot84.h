@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 static void setup_reset_and_clear(struct hda_codec *codec)
 {
