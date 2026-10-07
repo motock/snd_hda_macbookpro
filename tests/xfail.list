@@ -35,3 +35,31 @@
 # Fixing the hooks is a separate story.  Until then this test fails on purpose
 # so the drift stays visible instead of being papered over.
 test_hooks_apply.sh
+
+# ---------------------------------------------------------------------------
+# test_spdx_batch2.sh -- HDA-41's test, not HDA-03's.  It is listed here
+# because it fails on this branch for a reason that is entirely inside that
+# test, and HDA-03 must not "fix" another story's test.
+#
+# The deliverable IS present: line 1 of both
+#   patch_cirrus/patch_cirrus_hda_generic_copy.h
+#   patch_cirrus/patch_cirrus_new84.h
+# is `/* SPDX-License-Identifier: GPL-2.0-or-later */`, and B1-B5 pass.
+#
+# B6 is what fails.  It derives the pre-story tree as
+#
+#     BASE=$(git log --format=%H -1 -- tests/test_spdx_batch2.sh)
+#
+# i.e. the commit that INTRODUCED the test file.  HDA-41 added the test file
+# and the two SPDX lines in the SAME commit (267fe6c), so
+# `git diff "$BASE" -- <deliverable>` is empty, _adds is 0, and B6's
+# "must add exactly one line" assertion can never hold.  The base needs to be
+# that commit's parent (267fe6c^), not the commit itself.
+#
+# Verified independent of HDA-03: neither HDA-03 commit (3b4ccb2, 2964d85)
+# touches tests/test_spdx_batch2.sh or either deliverable, and the B6 diff is
+# empty at 267fe6c and at every commit after it.
+#
+# Fixing B6 is HDA-41's job.  Until then this test fails on purpose so the
+# broken base detection stays visible instead of being papered over.
+test_spdx_batch2.sh

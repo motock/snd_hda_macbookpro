@@ -283,16 +283,20 @@ corrupt_diff() {
 }
 
 neg_tree="$scratch/neg-tree"
-obtain old "$neg_tree"
-neg_hda="$neg_tree/sound/pci/hda"
-# patch_patch_cs8409.h.diff is used because it removes lines; a pure-addition
-# hook (patch_patch_cs8409.c.diff) has nothing to corrupt.
-neg_src="$REPO_ROOT/patch_patch_cs8409.h.diff"
+obtain new "$neg_tree"
+neg_hda="$neg_tree/sound/hda"
+# patch_cs8409.h.diff is used because it removes lines (a pure-addition hook
+# such as patch_cs8409.c.diff has nothing to corrupt) AND because it is one of
+# the hooks that applies to the new tree with no offset.  That second property
+# is what makes the delta assertion below meaningful: an uncorrupted run of this
+# same diff records zero failures, so any failure the corrupted copy records is
+# attributable to the corruption and not to pre-existing drift.
+neg_src="$REPO_ROOT/patch_cs8409.h.diff"
 neg_diff="$scratch/$(basename "$neg_src")"
 corrupt_diff "$neg_src" "$neg_diff"
 assert_file_exists "$neg_diff" "the corrupted diff copy was written to the scratch dir"
 
-run_patch "$neg_hda" -p2 "$neg_diff" --dry-run
+run_patch "$neg_hda" -p1 "$neg_diff" --dry-run
 assert_ne 0 "$PATCH_RC" "a corrupted diff must not be reported as applying cleanly"
 assert_contains "$PATCH_OUT" "$(diff_target_basename "$neg_diff")" \
   "the failure names the file the corrupted diff patches"
@@ -300,12 +304,21 @@ assert_contains "$PATCH_OUT" "hunks failed" \
   "the failure says the hunk did not apply"
 
 # Stronger: push the corrupted diff through the very same apply_one() the real
-# hooks go through, and assert that it records a failure.  apply_one()'s
+# hooks are graded by, and assert that it records a failure.  apply_one()'s
 # messages name both the diff and the tree, so a corrupted hook cannot slip
 # through the check the real hooks are graded by.
-neg_failures_before=$HDA_ASSERT_FAILURES
-apply_one "$neg_tree" "$neg_hda" -p2 "$neg_diff" "negative"
-assert_ne "$neg_failures_before" "$HDA_ASSERT_FAILURES" \
+#
+# apply_one() runs in a subshell on purpose.  Its failures are EXPECTED here,
+# and assert.sh counts failures in the global HDA_ASSERT_FAILURES that `finish`
+# turns into this file's exit status -- so calling apply_one() directly would
+# make the negative case fail the whole file.  The subshell keeps that tally
+# private and reports the delta, which is the verdict we actually want.
+neg_failures=$(
+  neg_before=$HDA_ASSERT_FAILURES
+  apply_one "$neg_tree" "$neg_hda" -p2 "$neg_diff" "negative" >/dev/null 2>&1
+  printf '%s' "$((HDA_ASSERT_FAILURES - neg_before))"
+)
+assert_ne 0 "${neg_failures:-0}" \
   "the corrupted diff is rejected by the same check the real hooks go through"
 note "negative case: corrupted $(basename "$neg_src") rejected as expected"
 
