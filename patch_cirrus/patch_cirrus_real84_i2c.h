@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 // this contains functions converted to use proper i2c calls
 
