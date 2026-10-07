@@ -240,7 +240,14 @@ fi
 # deliverable gains exactly one line and loses or modifies none.
 # ---------------------------------------------------------------------------
 
-BASE=$(git log --format=%H -1 -- tests/test_spdx_batch2.sh)
+# The pre-story tree is the PARENT of the commit that introduced this test
+# file.  The test file and the batch-2 header edits landed in the same commit,
+# so anchoring on the introducing commit itself would diff the headers against
+# a tree that already contains the SPDX lines and report zero added lines.
+BASE=$(git log --diff-filter=A --format=%H -1 -- tests/test_spdx_batch2.sh)
+if [ -n "$BASE" ]; then
+  BASE=$(git rev-parse --verify --quiet "$BASE^" || true)
+fi
 if [ -z "$BASE" ]; then
   assert_eq "found" "not found" "B6: cannot locate the pre-story base commit (tests/test_spdx_batch2.sh must be committed)"
 else
