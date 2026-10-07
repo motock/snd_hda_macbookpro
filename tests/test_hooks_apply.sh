@@ -289,8 +289,9 @@ neg_hda="$neg_tree/sound/hda"
 # such as patch_cs8409.c.diff has nothing to corrupt) AND because it is one of
 # the hooks that applies to the new tree with no offset.  That second property
 # is what makes the delta assertion below meaningful: an uncorrupted run of this
-# same diff records zero failures, so any failure the corrupted copy records is
-# attributable to the corruption and not to pre-existing drift.
+# same diff resolves and applies with no failed hunks under the same -p1 (see
+# the baseline immediately below), so any failure the corrupted copy records is
+# attributable to the corruption and not to a wrong -p or pre-existing drift.
 neg_src="$REPO_ROOT/patch_cs8409.h.diff"
 neg_diff="$scratch/$(basename "$neg_src")"
 corrupt_diff "$neg_src" "$neg_diff"
@@ -302,6 +303,22 @@ assert_contains "$PATCH_OUT" "$(diff_target_basename "$neg_diff")" \
   "the failure names the file the corrupted diff patches"
 assert_contains "$PATCH_OUT" "hunks failed" \
   "the failure says the hunk did not apply"
+
+# Baseline for the delta below: the SAME diff, uncorrupted, must go through the
+# SAME apply_one() with the SAME -p1 and record ZERO failures.  Without this the
+# delta would be vacuous -- a diff that cannot resolve its target at all (wrong
+# -p, missing file) records a failure too, and then the corruption would not be
+# what apply_one() rejected.  apply_one() patches for real, so the baseline gets
+# its own pristine tree and the corrupted run below keeps neg_tree untouched.
+neg_base_tree="$scratch/neg-base-tree"
+obtain new "$neg_base_tree"
+neg_baseline_failures=$(
+  neg_before=$HDA_ASSERT_FAILURES
+  apply_one "$neg_base_tree" "$neg_base_tree/sound/hda" -p1 "$neg_src" "negative-baseline" >/dev/null 2>&1
+  printf '%s' "$((HDA_ASSERT_FAILURES - neg_before))"
+)
+assert_eq 0 "${neg_baseline_failures:-1}" \
+  "an uncorrupted $(basename "$neg_src") must record zero failures under -p1 (baseline for the delta below)"
 
 # Stronger: push the corrupted diff through the very same apply_one() the real
 # hooks are graded by, and assert that it records a failure.  apply_one()'s
@@ -315,7 +332,7 @@ assert_contains "$PATCH_OUT" "hunks failed" \
 # private and reports the delta, which is the verdict we actually want.
 neg_failures=$(
   neg_before=$HDA_ASSERT_FAILURES
-  apply_one "$neg_tree" "$neg_hda" -p2 "$neg_diff" "negative" >/dev/null 2>&1
+  apply_one "$neg_tree" "$neg_hda" -p1 "$neg_diff" "negative" >/dev/null 2>&1
   printf '%s' "$((HDA_ASSERT_FAILURES - neg_before))"
 )
 assert_ne 0 "${neg_failures:-0}" \
