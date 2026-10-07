@@ -106,6 +106,15 @@ for _km in "${KNOWN_MISSING[@]}"; do
   assert_file_exists "$_km" "KNOWN_MISSING entry must name an existing header"
 done
 
+# A batch-1 deliverable must never be exemptible: if one shows up in
+# KNOWN_MISSING the exemption list is being used to dodge the work.
+for _r in "${REQUIRED[@]}"; do
+  assert_file_exists "$_r" "REQUIRED entry must name an existing header"
+  if is_known_missing "$_r" "${KNOWN_MISSING[@]}"; then
+    assert_eq "not exempt" "exempt" "$_r: a REQUIRED header is listed in KNOWN_MISSING"
+  fi
+done
+
 for _h in patch_cirrus/*.h; do
   _tags=$(spdx_tags "$_h" "${KNOWN_MISSING[@]}")
   if [ -n "$_tags" ]; then
