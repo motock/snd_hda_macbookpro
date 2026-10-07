@@ -197,11 +197,14 @@ apply_one() {
   if [ "$PATCH_RC" -eq 0 ]; then
     APPLIED_COUNT=$((APPLIED_COUNT + 1))
     APPLIED_DIFFS="$APPLIED_DIFFS $(basename "$diff")"
+    # Fuzz and offset are only meaningful when the hook applied: they are the
+    # warnings patch prints for a hunk that landed somewhere other than where
+    # the diff said it would.
+    assert_eq "absent" "$(grep_ci "$report" 'fuzz' && echo present || echo absent)" \
+      "$label: $diff applied with fuzz to $tree -- the hook is drifting (output: $report)"
+    assert_eq "absent" "$(grep_ci "$report" 'offset' && echo present || echo absent)" \
+      "$label: $diff applied with offset to $tree -- the hook is drifting (output: $report)"
   fi
-  assert_eq "absent" "$(grep_ci "$report" 'fuzz' && echo present || echo absent)" \
-    "$label: $diff applied with fuzz to $tree -- the hook is drifting (output: $report)"
-  assert_eq "absent" "$(grep_ci "$report" 'offset' && echo present || echo absent)" \
-    "$label: $diff applied with offset to $tree -- the hook is drifting (output: $report)"
 }
 
 # check_no_stray <tree> <label> <allowed .orig paths...>
@@ -295,6 +298,15 @@ assert_contains "$PATCH_OUT" "$(diff_target_basename "$neg_diff")" \
   "the failure names the file the corrupted diff patches"
 assert_contains "$PATCH_OUT" "hunks failed" \
   "the failure says the hunk did not apply"
+
+# Stronger: push the corrupted diff through the very same apply_one() the real
+# hooks go through, and assert that it records a failure.  apply_one()'s
+# messages name both the diff and the tree, so a corrupted hook cannot slip
+# through the check the real hooks are graded by.
+neg_failures_before=$HDA_ASSERT_FAILURES
+apply_one "$neg_tree" "$neg_hda" -p2 "$neg_diff" "negative"
+assert_ne "$neg_failures_before" "$HDA_ASSERT_FAILURES" \
+  "the corrupted diff is rejected by the same check the real hooks go through"
 note "negative case: corrupted $(basename "$neg_src") rejected as expected"
 
 # ---------------------------------------------------------------------------
