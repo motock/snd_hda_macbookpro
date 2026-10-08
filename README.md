@@ -178,7 +178,7 @@ above. This needs network access and the kernel headers package for the running
 kernel (`linux-headers-<release>`). The mainline sources lack Ubuntu's
 backports, so the build can fail on some kernels.
 
-The cs8409 patches apply to mainline 6.17, 7.0, 7.1 and 7.2; on 7.0 the header
+The cs8409 patches apply to mainline 6.17, 7.0 and 7.1; on 7.0 the header
 patch applies with fuzz.
 
 **Limits**
