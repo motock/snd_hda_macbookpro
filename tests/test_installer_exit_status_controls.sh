@@ -33,6 +33,10 @@ OLD_UNAME=5.19.0
 hda_shims_setup > /dev/null || { echo "cannot build the shim directory" >&2; exit 1; }
 hda_sandbox_setup > /dev/null || { echo "cannot build the sandbox" >&2; exit 1; }
 
+# The pre-6.17 installer stages its dkms tree under /usr/src; keep it in the sandbox.
+SND_HDA_USR_SRC=$(make_tmpdir) || { echo "cannot build the staging dir" >&2; exit 1; }
+export SND_HDA_USR_SRC
+
 # Every shim succeeds unless a test says otherwise.
 export HDA_SHIM_RC=0
 
