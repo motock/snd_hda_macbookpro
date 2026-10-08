@@ -123,6 +123,15 @@ fi
 # ---------------------------------------------------------------------------
 # (d) the hook-apply test still passes for both pinned trees
 # ---------------------------------------------------------------------------
+# tests/test_hooks_apply.sh is itself xfail-listed: two pre-6.17 hooks apply to
+# the pinned 6.12 tree with an offset, which is drift this story must not fix.
+# So the pass condition here is "no worse than the base", which is what the
+# story actually requires:
+#   * all 5 root *.diff hooks in play must apply (the malformed
+#     patch_cs8409.h.diff this story once shipped only managed 3 of 5), and
+#   * every remaining failure must be the known offset drift.
+# Any other failure -- a .rej, a malformed patch, an orphan hook -- is a
+# regression and fails this guard.
 if [ -f tests/test_hooks_apply.sh ]; then
   hooks_log=$(mktemp 2>/dev/null || printf '/tmp/hda20_hooks.%s' "$$")
   bash tests/test_hooks_apply.sh >"$hooks_log" 2>&1
@@ -132,8 +141,19 @@ if [ -f tests/test_hooks_apply.sh ]; then
   elif [ "$hooks_rc" -eq 77 ]; then
     printf 'skip - tests/test_hooks_apply.sh skipped (rc=77)\n'
   else
-    bad "tests/test_hooks_apply.sh failed (rc=$hooks_rc); tail:"
-    tail -20 "$hooks_log"
+    applied_line=$(grep -o 'hooks applied: [0-9]* of [0-9]* in play' "$hooks_log" | tail -1)
+    # Drop the two known-drift failures: the per-hook "applied with offset"
+    # lines and the assertion-count line that only counts them.
+    bad_failures=$(grep '^FAIL' "$hooks_log" \
+                   | grep -v 'applied with offset' \
+                   | grep -v 'assertion(s) failed' || true)
+    if printf '%s' "$applied_line" | grep -q 'hooks applied: 5 of 5 in play' \
+       && [ -z "$bad_failures" ]; then
+      ok "hooks apply to both pinned trees ($applied_line); only the xfail-listed offset drift remains"
+    else
+      bad "tests/test_hooks_apply.sh regressed (rc=$hooks_rc); tail:"
+      tail -20 "$hooks_log"
+    fi
   fi
   rm -f "$hooks_log"
 else
