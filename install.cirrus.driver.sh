@@ -4,6 +4,12 @@
 
 set -e
 
+# Resolve the checkout once; every build path below is absolute so the
+# installer works from any cwd.
+repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+build_dir="$repo_dir/build"
+hda_dir="$build_dir/hda"
+
 # Storing the script arguments before processing them if needed for pre617 script
 script_arguments_pre617="${@}"
 
@@ -39,7 +45,7 @@ revpart3=$(echo $revision | cut -d '-' -f3)
 
 if [ $major_version -lt 6 -o \( $major_version -eq 6 -a $minor_version -lt 17 \) ]; then
 
-	exec ./install.cirrus.driver.pre617.sh $script_arguments_pre617
+	exec "$repo_dir/install.cirrus.driver.pre617.sh" $script_arguments_pre617
 fi
 
 # keeping this code around in case need it for older versions later on
@@ -142,15 +148,13 @@ else
 fi
 
 # note that the update_dir definition below relies on a symbolic link of /lib to /usr/lib on Arch
-cur_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd)
-build_dir='build'
+cur_dir=$repo_dir
 patch_dir="$cur_dir/patch_cirrus"
 makefiles_dir="$cur_dir/makefiles"
-hda_dir="$cur_dir/$build_dir/hda"
 update_dir="/lib/modules/${UNAME}/updates"
 
-[[ -d $hda_dir ]] && rm -rf $hda_dir
-[[ ! -d $build_dir ]] && mkdir $build_dir
+[[ -d $hda_dir ]] && rm -rf "$hda_dir"
+[[ ! -d $build_dir ]] && mkdir "$build_dir"
 
 # fedora doesnt seem to install patch by default so need to explicitly install it
 if [ $isfedora -ge 1 ]; then
@@ -194,7 +198,7 @@ fi
 
 if [ $use_ubuntu_source -ge 1 ]; then
 
-	tar --strip-components=2 -xvf /usr/src/linux-source-$kernel_version.tar.bz2 --directory=build/ linux-source-$kernel_version/sound/hda
+	tar --strip-components=2 -xvf /usr/src/linux-source-$kernel_version.tar.bz2 --directory="$build_dir" linux-source-$kernel_version/sound/hda
 
 else
 	# here we assume the distribution kernel source is essentially the mainline kernel source
@@ -207,7 +211,7 @@ else
 	[[ -f $build_dir/linux-$kernel_version.tar.xz ]] && { verify_kernel_tarball $build_dir/linux-$kernel_version.tar.xz $kernel_version || true; }
 
 	# attempt to download linux-x.x.x.tar.xz kernel
-	wget -c https://cdn.kernel.org/pub/linux/kernel/v$major_version.x/linux-$kernel_version.tar.xz -P $build_dir
+	wget -c https://cdn.kernel.org/pub/linux/kernel/v$major_version.x/linux-$kernel_version.tar.xz -P "$build_dir"
 	rc=$?
 
 	if [[ $rc -eq 0 ]]; then
@@ -224,7 +228,7 @@ else
    		# if first attempt fails, attempt to download linux-x.x.tar.xz kernel
    		kernel_version=$major_version.$minor_version
    		[[ -f $build_dir/linux-$kernel_version.tar.xz ]] && { verify_kernel_tarball $build_dir/linux-$kernel_version.tar.xz $kernel_version || true; }
-   		wget -c https://cdn.kernel.org/pub/linux/kernel/v$major_version.x/linux-$kernel_version.tar.xz -P $build_dir
+   		wget -c https://cdn.kernel.org/pub/linux/kernel/v$major_version.x/linux-$kernel_version.tar.xz -P "$build_dir"
 		rc=$?
 
 		[[ $rc -ne 0 ]] && echo "kernel could not be downloaded...exiting" >&2 && exit 1
@@ -233,7 +237,7 @@ else
 
 	set -e
 
-	tar --strip-components=2 -xvf $build_dir/linux-$kernel_version.tar.xz --directory=build/ linux-$kernel_version/sound/hda
+	tar --strip-components=2 -xvf "$build_dir"/linux-$kernel_version.tar.xz --directory="$build_dir" linux-$kernel_version/sound/hda
 
 fi
 
@@ -352,14 +356,14 @@ if [[ ! $dkms = true ]]; then
 
 	rc=0
 	if [ $PATCH_CIRRUS = true ]; then
-		make PATCH_CIRRUS=1 || rc=$?
+		make -C "$repo_dir" PATCH_CIRRUS=1 || rc=$?
 		check_module_built
-		make install PATCH_CIRRUS=1 || rc=$?
+		make -C "$repo_dir" install PATCH_CIRRUS=1 || rc=$?
 
 	else
-		make KERNELRELEASE=$UNAME || rc=$?
+		make -C "$repo_dir" KERNELRELEASE=$UNAME || rc=$?
 		check_module_built
-		make install KERNELRELEASE=$UNAME || rc=$?
+		make -C "$repo_dir" install KERNELRELEASE=$UNAME || rc=$?
 
 	fi
 	if [[ $rc -ne 0 ]]; then

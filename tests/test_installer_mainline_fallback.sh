@@ -131,7 +131,7 @@ test_should_download_mainline_when_package_absent() {
   hda_assert_shim_called wget "https://cdn.kernel.org/pub/linux/kernel/v7.x/linux-7.0.tar.xz" \
     "downloads the mainline $MAINLINE tarball (output: $(hda_installer_output_oneline))" || return 1
   assert_contains "$HDA_INSTALLER_OUTPUT" "verified linux-7.0.tar.xz" "verifies its SHA-256" || return 1
-  hda_assert_shim_called tar "--strip-components=2 -xvf build/linux-7.0.tar.xz --directory=build/ linux-7.0/sound/hda" \
+  hda_assert_shim_called tar "--strip-components=2 -xvf $(cd "$HDA_SANDBOX" && pwd)/build/linux-7.0.tar.xz --directory=$(cd "$HDA_SANDBOX" && pwd)/build linux-7.0/sound/hda" \
     "extracts sound/hda from the mainline tarball" || return 1
   assert_contains "$HDA_INSTALLER_OUTPUT" "$NOTE" "prints the using-mainline note"
 }
