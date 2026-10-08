@@ -430,7 +430,7 @@ index d0b725c..d8b5232 100644
  	unsigned int suspended:1;
  	unsigned int paged:1;
  	unsigned int last_page;
-@@ -342,6 +368,134 @@
+@@ -342,6 +368,136 @@
  	unsigned int init_done:1;
  	unsigned int build_ctrl_done:1;
  
@@ -459,12 +459,13 @@ index d0b725c..d8b5232 100644
 +	// responses
 +	// we use a pre-allocated list - if we have more than 10 outstanding unsols
 +	// we will drop
-+	//
-+	// unsol_lock protects unsol_list and unsol_items_prealloc_used (the
-+	// prealloc slot bookkeeping).
-+	// It is a spinlock because the enqueue path (the unsolicited-event work
-+	// item) can run in atomic context.  The drain path releases it before it
-+	// calls the handlers, because those handlers do codec/I2C I/O and sleep.
++	// unsol_lock protects unsol_list and the unsol_items_prealloc_used[]
++	// slot bookkeeping.  The enqueue path (the unsolicited-event work item,
++	// which runs in workqueue/process context) and the drain/PCM paths can
++	// race, so every queue mutation is taken under this spinlock.  It is
++	// held only for the slot claim, list_add_tail, list_splice_init and the
++	// slot release, and is ALWAYS dropped before the response handlers run
++	// because those handlers do codec/I2C I/O that sleeps.
 +	int block_unsol;
 +	struct list_head unsol_list;
 +	struct unsol_item unsol_items_prealloc[10];
