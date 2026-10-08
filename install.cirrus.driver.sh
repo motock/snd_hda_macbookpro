@@ -43,7 +43,13 @@ if [ $major_version -lt 6 -o \( $major_version -eq 6 -a $minor_version -lt 17 \)
 fi
 
 # keeping this code around in case need it for older versions later on
-# the repo dkms.conf will now be the current version with no edits needed
+# This installer edits nothing: the tracked dkms.conf already carries the
+# >= 6.17 values (BUILT_MODULE_NAME[0]="snd-hda-codec-cs8409",
+# BUILT_MODULE_LOCATION[0]="build/hda/codecs/cirrus",
+# PRE_BUILD="install.cirrus.driver.sh -k $kernelver --dkms"), so dkms reads it
+# in place.  Kernels below 6.17 are handed to install.cirrus.driver.pre617.sh
+# (exec'd above), which stages its own edited copy of dkms.conf rather than
+# mutating the checkout.
 #if [ -e dkms.conf.orig ]; then
 #    sed -i 's/^BUILT_MODULE_NAME\[0\].*$/BUILT_MODULE_NAME[0]="snd-hda-codec-cs8409"/' dkms.conf
 #else

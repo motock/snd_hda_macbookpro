@@ -37,24 +37,19 @@ revpart2=$(echo $revision | cut -d '-' -f2)
 revpart3=$(echo $revision | cut -d '-' -f3)
 
 
+# The dkms.conf edits that used to be applied here are now applied to a staged
+# copy of the tree (see the dkms install branch below), never to the tracked
+# $repo/dkms.conf.  dkms.sh runs `dkms install -c dkms.conf` from its own
+# directory, so editing the checkout in place dirtied it -- and the first run's
+# `sed -i.orig` also left an untracked dkms.conf.orig behind.  Only the module
+# name depends on the kernel version.
 if [ $major_version -eq 5 -a $minor_version -lt 13 ]; then
-    if [ -e dkms.conf.orig ]; then
-        sed -i 's/^BUILT_MODULE_NAME\[0\].*$/BUILT_MODULE_NAME[0]="snd-hda-codec-cirrus"/' dkms.conf
-    else
-        sed -i.orig 's/^BUILT_MODULE_NAME\[0\].*$/BUILT_MODULE_NAME[0]="snd-hda-codec-cirrus"/' dkms.conf
-    fi
+    DKMS_BUILT_MODULE_NAME="snd-hda-codec-cirrus"
     PATCH_CIRRUS=true
 else
-    if [ -e dkms.conf.orig ]; then
-        sed -i 's/^BUILT_MODULE_NAME\[0\].*$/BUILT_MODULE_NAME[0]="snd-hda-codec-cs8409"/' dkms.conf
-    else
-        sed -i.orig 's/^BUILT_MODULE_NAME\[0\].*$/BUILT_MODULE_NAME[0]="snd-hda-codec-cs8409"/' dkms.conf
-    fi
+    DKMS_BUILT_MODULE_NAME="snd-hda-codec-cs8409"
     PATCH_CIRRUS=false
 fi
-
-sed -i 's/^BUILT_MODULE_LOCATION\[0\].*$/BUILT_MODULE_LOCATION[0]="build\/hda"/' dkms.conf
-sed -i 's/^PRE_BUILD.*$/PRE_BUILD="install.cirrus.driver.pre617.sh -k $kernelver --dkms"/' dkms.conf
 
 
 if [[ $dkms_action == 'install' ]]; then
@@ -62,12 +57,35 @@ if [[ $dkms_action == 'install' ]]; then
     # we remove any non-dkms module just in case
     # we can only have one dkms module with same file name prefix under the whole /lib/modules/{kernel version} directory
     update_dir="/lib/modules/${UNAME}/updates"
-    [[ -e $update_dir/snd-hda-codec-cs8409.ko ]] && rm $update_dir/snd-hda-codec-cs8409.ko && echo "removed $update_dir/snd-hda-co
-dec-cs8409.ko"
+    [[ -e $update_dir/snd-hda-codec-cs8409.ko ]] && rm $update_dir/snd-hda-codec-cs8409.ko && echo "removed $update_dir/snd-hda-codec-cs8409.ko"
 
-    # run dkms install script
+    # dkms.sh runs `dkms install -c dkms.conf` from its own directory and
+    # symlinks that directory into /usr/src, so dkms reads dkms.conf in place.
+    # Editing the tracked $repo/dkms.conf would dirty the checkout (and the old
+    # `sed -i.orig` also left an untracked dkms.conf.orig behind), so stage a
+    # copy of the tree dkms needs in a temp dir, edit the copy, and point dkms
+    # at the copy.  The temp dir is removed on exit.
+    repo_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
+    stage_dir=$(mktemp -d "${TMPDIR:-/tmp}/snd-hda-dkms.XXXXXX")
+    [[ -d $stage_dir ]] || { echo "cannot create a staging directory" >&2; exit 1; }
+    trap 'rm -rf "$stage_dir"' EXIT
+
+    for _entry in "$repo_dir"/*; do
+        [[ -e $_entry ]] || continue
+        case "${_entry##*/}" in
+            # build/ is a previous run's output and tests/ is not needed by dkms
+            build|tests) continue ;;
+        esac
+        cp -R "$_entry" "$stage_dir/" || { echo "cannot stage $_entry" >&2; exit 1; }
+    done
+
+    sed -i "s/^BUILT_MODULE_NAME\[0\].*$/BUILT_MODULE_NAME[0]=\"$DKMS_BUILT_MODULE_NAME\"/" "$stage_dir/dkms.conf"
+    sed -i 's/^BUILT_MODULE_LOCATION\[0\].*$/BUILT_MODULE_LOCATION[0]="build\/hda"/' "$stage_dir/dkms.conf"
+    sed -i 's/^PRE_BUILD.*$/PRE_BUILD="install.cirrus.driver.pre617.sh -k $kernelver --dkms"/' "$stage_dir/dkms.conf"
+
+    # run dkms install script against the staged copy
     rc=0
-    bash dkms.sh || rc=$?
+    ( cd "$stage_dir" && bash dkms.sh ) || rc=$?
     if [[ $rc -ne 0 ]]; then
         echo "dkms install failed (exit $rc)" >&2
     fi
