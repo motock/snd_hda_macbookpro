@@ -42,6 +42,10 @@
 #   5  pre-6.17 installer, remove branch: the old edits ran before the action
 #      branch, so a remove run dirtied the checkout too; it must leave the
 #      checkout byte-identical.
+#   6  pre-6.17 installer, 5.19: the /usr/src/snd_hda_macbookpro-0.1 symlink
+#      dkms.sh creates must not be left dangling when the installer's EXIT trap
+#      removes the staged dir it points at, and `dkms.sh -r` must remove it even
+#      when it dangles.
 #
 # Exit codes: 0 pass, 1 fail, 77 skip.
 
@@ -110,6 +114,51 @@ exit "$_rc"
 FAKE
 chmod +x "$HDA_SHIMS/dkms" || exit 1
 
+# --- /usr/src symlink: fake root plus ln/rm shims ---------------------------
+# dkms.sh:48 symlinks the directory it runs from into /usr/src
+# (`ln -sfn $cur_dir /usr/src/snd_hda_macbookpro-0.1`) and dkms.sh:35 removes
+# that symlink again on uninstall (`rm -f $src_dir`).  /usr/src is not writable
+# here (on this host it does not even exist), so the generic no-op `ln` shim is
+# replaced by one that performs the real symlink into a fake /usr/src under a
+# scratch directory, and an `rm` shim translates the same path so dkms.sh:35's
+# removal is observable.  Both log their argv like every other shim.
+fake_usr_src_root=$(make_tmpdir) || exit 1
+HDA_FAKE_USR_SRC="$fake_usr_src_root/usr-src"
+mkdir -p "$HDA_FAKE_USR_SRC" || exit 1
+export HDA_FAKE_USR_SRC
+src_link="$HDA_FAKE_USR_SRC/snd_hda_macbookpro-0.1"
+
+_real_ln=$(command -v ln) || { echo "no ln on PATH" >&2; exit 1; }
+_real_rm=$(command -v rm) || { echo "no rm on PATH" >&2; exit 1; }
+
+cat > "$HDA_SHIMS/ln" <<FAKE
+#!/bin/bash
+printf 'ln %s\n' "\$*" >> "\$HDA_SHIM_LOG"
+_args=()
+for _a in "\$@"; do
+  case "\$_a" in
+    /usr/src/*) _a="\$HDA_FAKE_USR_SRC/\${_a#/usr/src/}" ;;
+  esac
+  _args+=("\$_a")
+done
+exec "$_real_ln" "\${_args[@]}"
+FAKE
+chmod +x "$HDA_SHIMS/ln" || exit 1
+
+cat > "$HDA_SHIMS/rm" <<FAKE
+#!/bin/bash
+printf 'rm %s\n' "\$*" >> "\$HDA_SHIM_LOG"
+_args=()
+for _a in "\$@"; do
+  case "\$_a" in
+    /usr/src/*) _a="\$HDA_FAKE_USR_SRC/\${_a#/usr/src/}" ;;
+  esac
+  _args+=("\$_a")
+done
+exec "$_real_rm" "\${_args[@]}"
+FAKE
+chmod +x "$HDA_SHIMS/rm" || exit 1
+
 hda_sandbox_setup > /dev/null || { echo "cannot build the sandbox" >&2; exit 1; }
 sandbox=$HDA_SANDBOX
 
@@ -165,6 +214,17 @@ assert_file_absent() {
   fi
   _hda_fail "$2 (expected no file '$1', but it exists)"
   return 1
+}
+
+# link_state <path> -- absent | dangling | valid.
+link_state() {
+  if [ ! -e "$1" ] && [ ! -L "$1" ]; then
+    printf 'absent\n'
+  elif [ -L "$1" ] && [ ! -e "$1" ]; then
+    printf 'dangling\n'
+  else
+    printf 'valid\n'
+  fi
 }
 
 # case_done <label> <failures_before> -- one PASS/FAIL line per case, so a run
@@ -328,6 +388,51 @@ test_pre617_remove_leaves_checkout_clean() {
 }
 
 # ---------------------------------------------------------------------------
+# case 6: the pre-6.17 installer must not leave a dangling /usr/src symlink
+# ---------------------------------------------------------------------------
+#
+# dkms.sh:48 symlinks the directory it runs from into /usr/src.  The pre-6.17
+# installer runs dkms.sh from its staged temp dir, so the symlink points there;
+# the installer's `trap 'rm -rf "$stage_dir"' EXIT` then deletes that directory
+# and leaves the symlink dangling.  dkms.sh:35's uninstall cleanup
+# (`[[ -e $src_dir ]] && rm -f $src_dir`) tests -e, which is false for a
+# dangling symlink, so the dead link also survives `dkms.sh -r`.  Both are
+# regressions against the old behaviour, where the symlink pointed at the
+# persistent checkout and was removed on uninstall.
+
+test_pre617_leaves_no_dangling_src_symlink() {
+  _failures_before=$HDA_ASSERT_FAILURES
+  reset_sandbox
+  rm -f "$src_link"
+
+  hda_installer_run install.cirrus.driver.pre617.sh -i -d -k "$OLD_UNAME"
+
+  assert_eq 0 "$HDA_INSTALLER_RC" \
+    "pre617 5.19 (src symlink): installer must exit 0 (output: $(hda_installer_output_oneline))"
+
+  # The installer must actually have reached dkms.sh, otherwise the assertions
+  # below would be vacuous.
+  assert_contains "$(hda_shim_calls dkms)" "dkms install" \
+    "pre617 5.19 (src symlink): the installer must have run dkms.sh"
+  assert_contains "$(hda_shim_calls ln)" "ln " \
+    "pre617 5.19 (src symlink): dkms.sh must have created the /usr/src symlink"
+
+  # The regression: after the installer exits, the symlink must not dangle.
+  assert_ne "dangling" "$(link_state "$src_link")" \
+    "pre617 5.19 (src symlink): the installer must not leave a dangling $src_link (its EXIT trap deletes the staged dir the symlink points at)"
+
+  # And `dkms.sh -r` must remove it, dangling or not.
+  hda_installer_run dkms.sh -r
+
+  assert_eq 0 "$HDA_INSTALLER_RC" \
+    "pre617 5.19 (src symlink): dkms.sh -r must exit 0 (output: $(hda_installer_output_oneline))"
+  assert_eq "absent" "$(link_state "$src_link")" \
+    "pre617 5.19 (src symlink): dkms.sh -r must remove the /usr/src symlink even when it dangles (dkms.sh:35 tests -e, false for a dangling symlink)"
+
+  case_done "pre617 5.19 (src symlink)" "$_failures_before"
+}
+
+# ---------------------------------------------------------------------------
 # run
 # ---------------------------------------------------------------------------
 
@@ -336,5 +441,6 @@ test_pre617_512_leaves_checkout_clean
 test_617_leaves_checkout_clean
 test_pre617_failed_install_leaves_checkout_clean
 test_pre617_remove_leaves_checkout_clean
+test_pre617_leaves_no_dangling_src_symlink
 
 finish
