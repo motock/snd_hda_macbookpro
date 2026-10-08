@@ -43,7 +43,22 @@ revpart1=$(echo $revision | cut -d '-' -f1)
 revpart2=$(echo $revision | cut -d '-' -f2)
 revpart3=$(echo $revision | cut -d '-' -f3)
 
-if [ $major_version -lt 6 -o \( $major_version -eq 6 -a $minor_version -lt 17 \) ]; then
+# Numeric per-component comparison: 6.9 < 6.17 and 6.100 > 6.17 (a string
+# comparison gets both wrong).
+version_lt() {
+	[ "$1" != "$2" ] && [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | head -n1)" = "$1" ]
+}
+
+is_kernel_release() {
+	[[ $1 =~ ^[0-9]+\.[0-9]+ ]]
+}
+
+if ! is_kernel_release "$UNAME"; then
+	echo "error: invalid kernel release '$UNAME' (expected MAJOR.MINOR[.PATCH], eg 6.17.0)" >&2
+	exit 1
+fi
+
+if version_lt "$kernel_version" 6.17; then
 
 	exec "$repo_dir/install.cirrus.driver.pre617.sh" $script_arguments_pre617
 fi
@@ -269,39 +284,11 @@ cp $patch_dir/patch_cirrus_real84_i2c.h $hda_dir/codecs/cirrus
 
 
 pushd $hda_dir > /dev/null
-# define the ubuntu/mainline versions that work at the moment
-# for ubuntu allow a range of revisions that work
-current_major=6
-current_minor=17
-current_minor_ubuntu=6
-current_rev_ubuntu=6
-latest_rev_ubuntu=6
-
-iscurrent=0
-if [ $isubuntu -ge 1 ]; then
-	if [ $major_version -gt $current_major ]; then
-		iscurrent=2
-	elif [ $major_version -eq $current_major -a $minor_version -gt $current_minor_ubuntu ]; then
-		iscurrent=2
-	elif [ $major_version -eq $current_major -a $minor_version -eq $current_minor_ubuntu -a $revpart2 -gt $latest_rev_ubuntu ]; then
-		iscurrent=2
-	elif [ $major_version -eq $current_major -a $minor_version -eq $current_minor_ubuntu -a $revpart2 -gt $current_rev_ubuntu ]; then
-		iscurrent=1
-	elif [ $major_version -eq $current_major -a $minor_version -eq $current_minor_ubuntu -a $revpart2 -eq $current_rev_ubuntu ]; then
-		iscurrent=1
-	else
-		iscurrent=-1
-	fi
-else
-	if [ $major_version -gt $current_major ]; then
-		iscurrent=2
-	elif [ $major_version -eq $current_major -a $minor_version -gt $current_minor ]; then
-		iscurrent=2
-	elif [ $major_version -eq $current_major -a $minor_version -eq $current_minor ]; then
-		iscurrent=1
-	else
-		iscurrent=-1
-	fi
+# the gate above guarantees kernel_version >= 6.17: 1 is the implemented
+# version, 2 is later than that
+iscurrent=1
+if version_lt 6.17 "$kernel_version"; then
+	iscurrent=2
 fi
 
 if [ $iscurrent -gt 1 ]; then
