@@ -425,7 +425,7 @@
  	unsigned int suspended:1;
  	unsigned int paged:1;
  	unsigned int last_page;
-@@ -342,6 +368,129 @@
+@@ -342,6 +368,134 @@
  	unsigned int init_done:1;
  	unsigned int build_ctrl_done:1;
  
@@ -454,11 +454,16 @@
 +       // responses
 +       // we use a pre-allocated list - if we have more than 10 outstanding unsols
 +       // we will drop
-+       // not clear if mutexes would be the way to go
++       //
++       // unsol_lock protects block_unsol, unsol_list and unsol_items_prealloc_used.
++       // It is a spinlock because the enqueue path (the unsolicited-event work
++       // item) can run in atomic context.  The drain path releases it before it
++       // calls the handlers, because those handlers do codec/I2C I/O and sleep.
 +       int block_unsol;
 +       struct list_head unsol_list;
 +       struct unsol_item unsol_items_prealloc[10];
 +       int unsol_items_prealloc_used[10];
++       spinlock_t unsol_lock;
 +
 +       // add in specific nids for the intmike and linein as they seem to swap
 +       // between macbook pros (14,3) and imacs (18,3)
