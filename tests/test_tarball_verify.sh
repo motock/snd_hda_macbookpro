@@ -4,8 +4,11 @@
 # the installers (HDA-11, B2).
 #
 # The kernel tarball must be checked against kernel.org's sha256sums.asc
-# before it is extracted, and any problem must fail closed: non-zero status,
-# an error on stderr, and the tarball deleted so `wget -c` cannot resume it.
+# before it is extracted, and any problem must fail closed: non-zero status
+# and an error on stderr.  Only a hash mismatch deletes the tarball, so that
+# `wget -c` cannot resume a poisoned file; every other failure (missing,
+# ambiguous or unreachable checksum, no hashing tool, ...) leaves the
+# possibly-good tarball in place.
 #
 # `wget` is replaced by a fake that serves a local fixture sums file for
 # `-O <file> <url>` and writes a fixture tarball for `-P <dir> <url>`; `tar`
