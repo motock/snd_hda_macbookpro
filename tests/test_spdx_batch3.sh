@@ -266,11 +266,19 @@ fi
 
 # ---------------------------------------------------------------------------
 # C9 -- the edit is still just line 1, even for the large header: relative to
-# the pre-story tree (the commit that introduced this test file), each
-# deliverable gains exactly one line and loses or modifies none.
+# the pre-story tree, each deliverable gains exactly one line and loses or
+# modifies none.
+#
+# The pre-story tree is the PARENT of the commit that introduced this test
+# file.  If the test file and the header edits ever land in the same commit,
+# anchoring on the introducing commit itself would diff the headers against a
+# tree that already contains the SPDX lines and report zero added lines.
 # ---------------------------------------------------------------------------
 
-BASE=$(git log --format=%H -1 -- tests/test_spdx_batch3.sh)
+BASE=$(git log --diff-filter=A --format=%H -1 -- tests/test_spdx_batch3.sh)
+if [ -n "$BASE" ]; then
+  BASE=$(git rev-parse --verify --quiet "$BASE^" || true)
+fi
 if [ -z "$BASE" ]; then
   assert_eq "found" "not found" "C9: cannot locate the pre-story base commit (tests/test_spdx_batch3.sh must be committed)"
 else
