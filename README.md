@@ -128,7 +128,7 @@ neither variable set it keeps the historical bare `depmod -a` (current kernel).
 # Check your kernel version
 uname -a
 # delete the ko file
-sudo rm /lib/modules/{kernel version}/updates/snd-hda-codec-cs8409.ko
+sudo rm /lib/modules/{kernel version}/updates/snd-hda-codec-cs8409.ko*
 sudo depmod -a
 ```
 
