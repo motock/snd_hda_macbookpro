@@ -3,17 +3,16 @@
 # tests/test_spdx.sh -- SPDX licence lines on patch_cirrus/*.h (batch 1).
 #
 # Requirements checked, one assertion group each:
-#   R1 every patch_cirrus/*.h that is NOT in KNOWN_MISSING carries, as its
-#      FIRST line, a C comment of exactly the shape
+#   R1 every patch_cirrus/*.h carries, as its FIRST line, a C comment of
+#      exactly the shape
 #          /* SPDX-License-Identifier: <expression> */
 #   R2 <expression> is the licence derived from the file's origin: the SPDX
 #      line of the kernel file it was copied from, or the project's declared
 #      licence (repo LICENSE is GPLv2).  Any other expression is an invented
 #      licence and is rejected.  Accepted: GPL-2.0, GPL-2.0-or-later.
 #   R3 exactly one SPDX line per file, and it is on line 1.
-#   R4 a header listed in KNOWN_MISSING must NOT carry an SPDX line yet; an
-#      entry whose file already has one is stale and must be deleted from
-#      the array by the story that adds the line.
+#   R4 the check is unconditional: there is no exemption list, so a header
+#      cannot dodge the SPDX line by being listed anywhere.
 #   R5 the insertion is comment-only: the preprocessed text of a header is
 #      identical with and without its first line (cc -E; the whole R5 group
 #      is skipped when no C preprocessor is installed).
@@ -24,16 +23,8 @@
 . "$(dirname "$0")/lib/assert.sh"
 cd "$(cd "$(dirname "$0")/.." && pwd)" || exit 1
 
-# Headers whose SPDX story has not landed yet (batch 3).  The story that adds
-# the SPDX line to one of these files must also remove it from this array,
-# otherwise R4 reports it as stale.
-KNOWN_MISSING=(
-  patch_cirrus/patch_cirrus_real84.h
-  patch_cirrus/patch_cirrus_real84_i2c.h
-)
-
 # This story's deliverables (batch 1).  They are checked strictly, with no
-# exemption, so that adding a name to KNOWN_MISSING cannot make them pass.
+# exemption, so that no header can dodge the SPDX line.
 REQUIRED=(
   patch_cirrus/cirrus_apple.h
   patch_cirrus/patch_cirrus_apple.h
@@ -43,15 +34,6 @@ REQUIRED=(
 # ---------------------------------------------------------------------------
 # checker
 # ---------------------------------------------------------------------------
-
-is_known_missing() {
-  _p=$1
-  shift
-  for _km in "$@"; do
-    [ "$_km" = "$_p" ] && return 0
-  done
-  return 1
-}
 
 # line1_expression <file> -- print the licence expression when line 1 is
 # exactly `/* SPDX-License-Identifier: X */` (whitespace-tolerant); otherwise
@@ -67,18 +49,14 @@ line1_expression() {
   printf '%s' "$_e" | sed -e 's/^ //' -e 's/ $//'
 }
 
-# spdx_tags <file> [known-missing...] -- print one violation tag per line:
+# spdx_tags <file> -- print one violation tag per line:
 #   missing         no SPDX line anywhere in the file
 #   not-line-1      line 1 is not a `/* SPDX-License-Identifier: X */` comment
 #   bad-expression  line 1 has the right shape but X is not an accepted licence
 #   duplicate       more than one SPDX line in the file
-#   stale           a known-missing file that already carries an SPDX line
 spdx_tags() {
   _f=$1
-  shift
-  if is_known_missing "$_f" "$@"; then
-    grep -q 'SPDX-License-Identifier' "$_f" 2>/dev/null && printf 'stale\n'
-  elif ! grep -q 'SPDX-License-Identifier' "$_f" 2>/dev/null; then
+  if ! grep -q 'SPDX-License-Identifier' "$_f" 2>/dev/null; then
     printf 'missing\n'
   else
     if [ "$(grep -c 'SPDX-License-Identifier' "$_f" 2>/dev/null)" -gt 1 ]; then
@@ -100,21 +78,13 @@ spdx_tags() {
 # R1-R4 against the real headers
 # ---------------------------------------------------------------------------
 
-for _km in "${KNOWN_MISSING[@]}"; do
-  assert_file_exists "$_km" "KNOWN_MISSING entry must name an existing header"
-done
-
-# A batch-1 deliverable must never be exemptible: if one shows up in
-# KNOWN_MISSING the exemption list is being used to dodge the work.
+# A batch-1 deliverable must never be exemptible: the check is unconditional.
 for _r in "${REQUIRED[@]}"; do
   assert_file_exists "$_r" "REQUIRED entry must name an existing header"
-  if is_known_missing "$_r" "${KNOWN_MISSING[@]}"; then
-    assert_eq "not exempt" "exempt" "$_r: a REQUIRED header is listed in KNOWN_MISSING"
-  fi
 done
 
 for _h in patch_cirrus/*.h; do
-  _tags=$(spdx_tags "$_h" "${KNOWN_MISSING[@]}")
+  _tags=$(spdx_tags "$_h")
   if [ -n "$_tags" ]; then
     assert_eq "" "$_tags" "$_h: SPDX licence line violations"
   fi
@@ -136,15 +106,11 @@ fix empty.h         ''
 fix blank_first.h   '\n/* SPDX-License-Identifier: GPL-2.0 */\nstruct blank { int x; };\n'
 fix bad_expr.h      '/* SPDX-License-Identifier: MIT */\nstruct bad { int x; };\n'
 fix dup_spdx.h      '/* SPDX-License-Identifier: GPL-2.0 */\nstruct dup { int x; };\n/* SPDX-License-Identifier: GPL-2.0 */\n'
-fix km_stale.h      '/* SPDX-License-Identifier: GPL-2.0 */\nstruct stale { int x; };\n'
-fix km_clean.h      'struct clean { int x; };\n'
-
-FIX_KM="$FIXDIR/km_clean.h $FIXDIR/km_stale.h"
 
 expect_tags() {
   _name=$1
   _want=$2
-  _got=$(spdx_tags "$FIXDIR/$_name" $FIX_KM | sort | tr '\n' ' ')
+  _got=$(spdx_tags "$FIXDIR/$_name" | sort | tr '\n' ' ')
   _got=${_got% }
   assert_eq "$_want" "$_got" "fixture $_name: expected SPDX violations"
 }
@@ -156,8 +122,6 @@ expect_tags empty.h         'missing'
 expect_tags blank_first.h   'not-line-1'
 expect_tags bad_expr.h      'bad-expression'
 expect_tags dup_spdx.h      'duplicate'
-expect_tags km_stale.h      'stale'
-expect_tags km_clean.h      ''
 
 # ---------------------------------------------------------------------------
 # R5 -- comment-only: dropping line 1 must not change the preprocessed text

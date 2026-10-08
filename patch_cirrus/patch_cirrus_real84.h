@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 
 static int tdm_in_use(struct hda_codec *codec, int where_flag)
 {
