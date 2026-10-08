@@ -63,6 +63,7 @@ done
 # unsol_items_prealloc_used while the depth is 0 is an offending line.
 offenders=$(
   awk '
+    /^[[:space:]]*(\/\/|\*|\/\*)/ { next }
     /spin_lock_irqsave\(&spec->unsol_lock/ { depth++; next }
     /spin_unlock_irqrestore\(&spec->unsol_lock/ { if (depth > 0) depth--; next }
     /unsol_list|unsol_items_prealloc_used/ {
@@ -80,6 +81,7 @@ fi
 # Structural sanity: the lock depth must return to zero and never go negative.
 depth_report=$(
   awk '
+    /^[[:space:]]*(\/\/|\*|\/\*)/ { next }
     /spin_lock_irqsave\(&spec->unsol_lock/ { depth++ }
     /spin_unlock_irqrestore\(&spec->unsol_lock/ {
       depth--
@@ -103,6 +105,7 @@ fi
 # done outside the critical section.
 between=$(
   awk '
+    /^[[:space:]]*(\/\/|\*|\/\*)/ { next }
     /spin_lock_irqsave\(&spec->unsol_lock/ { depth++; next }
     /spin_unlock_irqrestore\(&spec->unsol_lock/ { if (depth > 0) depth--; next }
     depth > 0 && (/memset[[:space:]]*\(/ || /cs_8409_cs42l83_unsolicited_response_finalize[[:space:]]*\(/) {
