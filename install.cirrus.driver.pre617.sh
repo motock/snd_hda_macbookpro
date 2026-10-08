@@ -32,15 +32,15 @@ done
 # Set UNAME prioritizing -k flag, then positional argument $1, and finally falling back to uname -r
 UNAME=${TARGET_UNAME:-${1:-$(uname -r)}}
 
-kernel_version=$(echo $UNAME | cut -d '-' -f1)  #ie 5.2.7
-major_version=$(echo $kernel_version | cut -d '.' -f1)
-minor_version=$(echo $kernel_version | cut -d '.' -f2)
+kernel_version=$(echo "$UNAME" | cut -d '-' -f1)  #ie 5.2.7
+major_version=$(echo "$kernel_version" | cut -d '.' -f1)
+minor_version=$(echo "$kernel_version" | cut -d '.' -f2)
 major_minor=${major_version}${minor_version}
 
-revision=$(echo $UNAME | cut -d '.' -f3)
-revpart1=$(echo $revision | cut -d '-' -f1)
-revpart2=$(echo $revision | cut -d '-' -f2)
-revpart3=$(echo $revision | cut -d '-' -f3)
+revision=$(echo "$UNAME" | cut -d '.' -f3)
+revpart1=$(echo "$revision" | cut -d '-' -f1)
+revpart2=$(echo "$revision" | cut -d '-' -f2)
+revpart3=$(echo "$revision" | cut -d '-' -f3)
 
 # Numeric per-component comparison: 6.9 < 6.17 and 6.100 > 6.17 (a string
 # comparison gets both wrong).
@@ -69,7 +69,7 @@ fi
 # directory, so editing the checkout in place dirtied it -- and the first run's
 # `sed -i.orig` also left an untracked dkms.conf.orig behind.  Only the module
 # name depends on the kernel version.
-if [ $major_version -eq 5 -a $minor_version -lt 13 ]; then
+if [ "$major_version" -eq 5 -a "$minor_version" -lt 13 ]; then
     DKMS_BUILT_MODULE_NAME="snd-hda-codec-cirrus"
     PATCH_CIRRUS=true
 else
@@ -144,7 +144,7 @@ if [[ $dkms_action == 'install' ]]; then
     # (although the original module should be copied to under /var/lib/dkms if needed for other distributions)
     update_dir="/lib/modules/${UNAME}/updates"
     echo -e "\ncontents of $update_dir"
-    ls -lA $update_dir || true
+    ls -lA "$update_dir" || true
     exit "$rc"
 
 elif [[ $dkms_action == 'remove' ]]; then
@@ -171,11 +171,11 @@ elif [[ $dkms_action == 'remove' ]]; then
 
 fi
 
-if [ $major_version == '4' ]; then
+if [ "$major_version" == '4' ]; then
 	echo "Kernel 4 versions no longer supported"
 fi
 
-if [ $major_version -eq 5 -a $minor_version -lt 8 ]; then
+if [ "$major_version" -eq 5 -a "$minor_version" -lt 8 ]; then
 	echo "Kernel 5 versions less than 5.8 no longer supported"
 fi
 
@@ -184,19 +184,19 @@ isfedora=0
 isarch=0
 isvoid=0
 
-if [ -d /usr/src/linux-headers-${UNAME} ]; then
+if [ -d "/usr/src/linux-headers-${UNAME}" ]; then
 	# Debian Based Distro
 	isdebian=1
 	:
-elif [ -d /usr/src/kernels/${UNAME} ]; then
+elif [ -d "/usr/src/kernels/${UNAME}" ]; then
 	# Fedora Based Distro
 	isfedora=1
 	:
-elif [ -d /usr/lib/modules/${UNAME} ]; then
+elif [ -d "/usr/lib/modules/${UNAME}" ]; then
 	# Arch Based Distro
 	isarch=1
 	:
-elif [ -d /usr/src/kernel-headers-${UNAME} ]; then
+elif [ -d "/usr/src/kernel-headers-${UNAME}" ]; then
 	# Void Linux
 	isvoid=1
 	:
@@ -233,13 +233,13 @@ fi
 
 isubuntu=0
 # Check if we are dealing with Ubuntu
-if [ $(grep '^NAME=' /etc/os-release | grep -c Ubuntu) -eq 1 ]; then
+if [ "$(grep '^NAME=' /etc/os-release | grep -c Ubuntu)" -eq 1 ]; then
         isubuntu=1
 # For Unbuntu based distributions like Mint, ubuntu will be mentionned in ID_LIKE
-elif [ $(grep '^ID_LIKE=' /etc/os-release | grep -c "ubuntu") -eq 1 ]; then
+elif [ "$(grep '^ID_LIKE=' /etc/os-release | grep -c "ubuntu")" -eq 1 ]; then
         isubuntu=1
 # In some other Unbuntu based distributions like Pop OS, we need to check ID
-elif [ $(grep '^ID=' /etc/os-release | grep -c "ubuntu") -eq 1 ]; then
+elif [ "$(grep '^ID=' /etc/os-release | grep -c "ubuntu")" -eq 1 ]; then
         isubuntu=1
 fi
 
@@ -253,7 +253,7 @@ if [ $isubuntu -ge 1 ]; then
         #           modified with extensive backports from later kernel versions
         #           (and in any case there is no linux-source-... package for hwe kernels)
 
-	if [ ! -e /usr/src/linux-source-$kernel_version.tar.bz2 ]; then
+	if [ ! -e "/usr/src/linux-source-$kernel_version.tar.bz2" ]; then
 
 		echo "Ubuntu linux kernel source not found in /usr/src: /usr/src/linux-source-$kernel_version.tar.bz2"
 		echo "assuming the linux kernel source package is not installed"
@@ -267,7 +267,7 @@ if [ $isubuntu -ge 1 ]; then
 
 	fi
 
-	tar --strip-components=3 -xvf /usr/src/linux-source-$kernel_version.tar.bz2 --directory="$build_dir" linux-source-$kernel_version/sound/pci/hda
+	tar --strip-components=3 -xvf "/usr/src/linux-source-$kernel_version.tar.bz2" --directory="$build_dir" "linux-source-$kernel_version/sound/pci/hda"
 
 else
 	# here we assume the distribution kernel source is essentially the mainline kernel source
@@ -277,14 +277,14 @@ else
 	. "$(dirname "$0")/lib/verify_kernel_tarball.sh"
 
 	# a cached tarball is only reused if it verifies; a bad one is deleted so wget -c cannot resume it
-	[[ -f $build_dir/linux-$kernel_version.tar.xz ]] && { verify_kernel_tarball $build_dir/linux-$kernel_version.tar.xz $kernel_version || true; }
+	[[ -f $build_dir/linux-$kernel_version.tar.xz ]] && { verify_kernel_tarball "$build_dir/linux-$kernel_version.tar.xz" "$kernel_version" || true; }
 
 	# attempt to download linux-x.x.x.tar.xz kernel
-	wget -c https://cdn.kernel.org/pub/linux/kernel/v$major_version.x/linux-$kernel_version.tar.xz -P "$build_dir"
+	wget -c "https://cdn.kernel.org/pub/linux/kernel/v$major_version.x/linux-$kernel_version.tar.xz" -P "$build_dir"
 	rc=$?
 
 	if [[ $rc -eq 0 ]]; then
-		verify_kernel_tarball $build_dir/linux-$kernel_version.tar.xz $kernel_version || exit 1
+		verify_kernel_tarball "$build_dir/linux-$kernel_version.tar.xz" "$kernel_version" || exit 1
 	else
 		echo "Failed to download linux-$kernel_version.tar.xz"
 		echo "Trying to download base kernel version linux-$major_version.$minor_version.tar.xz"
@@ -293,23 +293,23 @@ else
 		echo ""
    		# if first attempt fails, attempt to download linux-x.x.tar.xz kernel
    		kernel_version=$major_version.$minor_version
-   		[[ -f $build_dir/linux-$kernel_version.tar.xz ]] && { verify_kernel_tarball $build_dir/linux-$kernel_version.tar.xz $kernel_version || true; }
-   		wget -c https://cdn.kernel.org/pub/linux/kernel/v$major_version.x/linux-$kernel_version.tar.xz -P "$build_dir"
+   		[[ -f $build_dir/linux-$kernel_version.tar.xz ]] && { verify_kernel_tarball "$build_dir/linux-$kernel_version.tar.xz" "$kernel_version" || true; }
+   		wget -c "https://cdn.kernel.org/pub/linux/kernel/v$major_version.x/linux-$kernel_version.tar.xz" -P "$build_dir"
 		rc=$?
 
 		[[ $rc -ne 0 ]] && echo "kernel could not be downloaded...exiting" >&2 && exit 1
-		verify_kernel_tarball $build_dir/linux-$kernel_version.tar.xz $kernel_version || exit 1
+		verify_kernel_tarball "$build_dir/linux-$kernel_version.tar.xz" "$kernel_version" || exit 1
 	fi
 
 	set -e
 
-	tar --strip-components=3 -xvf "$build_dir"/linux-$kernel_version.tar.xz --directory="$build_dir" linux-$kernel_version/sound/pci/hda
+	tar --strip-components=3 -xvf "$build_dir/linux-$kernel_version.tar.xz" --directory="$build_dir" "linux-$kernel_version/sound/pci/hda"
 
 fi
 
-mv $hda_dir/Makefile $hda_dir/Makefile.orig
-cp $patch_dir/Makefile $patch_dir/patch_cirrus_* $hda_dir
-pushd $hda_dir > /dev/null
+mv "$hda_dir/Makefile" "$hda_dir/Makefile.orig"
+cp "$patch_dir/Makefile" "$patch_dir/patch_cirrus_"* "$hda_dir"
+pushd "$hda_dir" > /dev/null
 # 1 is the implemented version (or newer than the oldest Ubuntu revision that
 # works), 2 is later than the newest, -1 is older than the oldest
 # for ubuntu allow a range of revisions that work
@@ -333,7 +333,7 @@ if [ $iscurrent -gt 1 ]; then
 	echo "Kernel version later than implemented version - there may be build problems"
 fi
 
-if [ $major_version -eq 5 -a $minor_version -lt 13 ]; then
+if [ "$major_version" -eq 5 -a "$minor_version" -lt 13 ]; then
 	patch -b -p2 <../../patch_patch_cirrus.c.diff
 else
 	if [ $isubuntu -ge 1 ]; then
@@ -359,7 +359,7 @@ else
 			patch -b -p2 <../../patches/patch_patch_cs8409.h.main.pre519.diff
 		fi
 
-		cp $patch_dir/Makefile $patch_dir/patch_cirrus_* $hda_dir/
+		cp "$patch_dir/Makefile" "$patch_dir/patch_cirrus_"* "$hda_dir/"
 
 		if [ $iscurrent -ge 0 ]; then
 			patch -b -p2 <../../patch_patch_cirrus_apple.h.diff
@@ -370,7 +370,7 @@ fi
 
 popd > /dev/null
 
-[[ ! $dkms_action == 'install' ]] && [[ ! -d $update_dir ]] && mkdir $update_dir
+[[ ! $dkms_action == 'install' ]] && [[ ! -d $update_dir ]] && mkdir "$update_dir"
 
 #echo "DKMS VAR IS ${dkms}"
 
@@ -403,15 +403,15 @@ if [[ ! $dkms = true ]]; then
 		make -C "$repo_dir" install PATCH_CIRRUS=1 || rc=$?
 
 	else
-		make -C "$repo_dir" KERNELRELEASE=$UNAME || rc=$?
+		make -C "$repo_dir" "KERNELRELEASE=$UNAME" || rc=$?
 		check_module_built
-		make -C "$repo_dir" install KERNELRELEASE=$UNAME || rc=$?
+		make -C "$repo_dir" install "KERNELRELEASE=$UNAME" || rc=$?
 
 	fi
 	if [[ $rc -ne 0 ]]; then
 		echo "make failed (exit $rc)" >&2
 	fi
 	echo -e "\ncontents of $update_dir"
-	ls -lA $update_dir || true
+	ls -lA "$update_dir" || true
 	exit "$rc"
 fi
