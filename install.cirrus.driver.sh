@@ -11,7 +11,7 @@ build_dir="$repo_dir/build"
 hda_dir="$build_dir/hda"
 
 # Storing the script arguments before processing them if needed for pre617 script
-script_arguments_pre617="${@}"
+script_arguments_pre617=("$@")
 
 # Initialize empty variable to store the -k flag input safely
 TARGET_UNAME=""
@@ -33,15 +33,15 @@ done
 # Set UNAME prioritizing -k flag, then positional argument $1, and finally falling back to uname -r
 UNAME=${TARGET_UNAME:-${1:-$(uname -r)}}
 
-kernel_version=$(echo $UNAME | cut -d '-' -f1)  #ie 5.2.7
-major_version=$(echo $kernel_version | cut -d '.' -f1)
-minor_version=$(echo $kernel_version | cut -d '.' -f2)
+kernel_version=$(echo "$UNAME" | cut -d '-' -f1)  #ie 5.2.7
+major_version=$(echo "$kernel_version" | cut -d '.' -f1)
+minor_version=$(echo "$kernel_version" | cut -d '.' -f2)
 major_minor=${major_version}${minor_version}
 
-revision=$(echo $UNAME | cut -d '.' -f3)
-revpart1=$(echo $revision | cut -d '-' -f1)
-revpart2=$(echo $revision | cut -d '-' -f2)
-revpart3=$(echo $revision | cut -d '-' -f3)
+revision=$(echo "$UNAME" | cut -d '.' -f3)
+revpart1=$(echo "$revision" | cut -d '-' -f1)
+revpart2=$(echo "$revision" | cut -d '-' -f2)
+revpart3=$(echo "$revision" | cut -d '-' -f3)
 
 # Numeric per-component comparison: 6.9 < 6.17 and 6.100 > 6.17 (a string
 # comparison gets both wrong).
@@ -60,7 +60,7 @@ fi
 
 if version_lt "$kernel_version" 6.17; then
 
-	exec "$repo_dir/install.cirrus.driver.pre617.sh" $script_arguments_pre617
+	exec "$repo_dir/install.cirrus.driver.pre617.sh" "${script_arguments_pre617[@]}"
 fi
 
 # keeping this code around in case need it for older versions later on
@@ -113,7 +113,7 @@ if [[ $dkms_action == 'install' ]]; then
     # (although the original module should be copied to under /var/lib/dkms if needed for other distributions)
     update_dir="/lib/modules/${UNAME}/updates/dkms"
     echo -e "\ncontents of $update_dir"
-    ls -lA $update_dir || true
+    ls -lA "$update_dir" || true
     exit "$rc"
 
 elif [[ $dkms_action == 'remove' ]]; then
@@ -135,19 +135,19 @@ isfedora=0
 isarch=0
 isvoid=0
 
-if [ -d /usr/src/linux-headers-${UNAME} ]; then
+if [ -d "/usr/src/linux-headers-${UNAME}" ]; then
 	# Debian Based Distro
 	isdebian=1
 	:
-elif [ -d /usr/src/kernels/${UNAME} ]; then
+elif [ -d "/usr/src/kernels/${UNAME}" ]; then
 	# Fedora Based Distro
 	isfedora=1
 	:
-elif [ -d /usr/lib/modules/${UNAME} ]; then
+elif [ -d "/usr/lib/modules/${UNAME}" ]; then
 	# Arch Based Distro
 	isarch=1
 	:
-elif [ -d /usr/src/kernel-headers-${UNAME} ]; then
+elif [ -d "/usr/src/kernel-headers-${UNAME}" ]; then
 	# Void Linux
 	isvoid=1
 	:
@@ -185,13 +185,13 @@ fi
 
 isubuntu=0
 # Check if we are dealing with Ubuntu
-if [ $(grep '^NAME=' /etc/os-release | grep -c Ubuntu) -eq 1 ]; then
+if [ "$(grep '^NAME=' /etc/os-release | grep -c Ubuntu)" -eq 1 ]; then
         isubuntu=1
 # For Unbuntu based distributions like Mint, ubuntu will be mentionned in ID_LIKE
-elif [ $(grep '^ID_LIKE=' /etc/os-release | grep -c "ubuntu") -eq 1 ]; then
+elif [ "$(grep '^ID_LIKE=' /etc/os-release | grep -c "ubuntu")" -eq 1 ]; then
         isubuntu=1
 # In some other Unbuntu based distributions like Pop OS, we need to check ID
-elif [ $(grep '^ID=' /etc/os-release | grep -c "ubuntu") -eq 1 ]; then
+elif [ "$(grep '^ID=' /etc/os-release | grep -c "ubuntu")" -eq 1 ]; then
         isubuntu=1
 fi
 
@@ -206,7 +206,7 @@ if [ $isubuntu -ge 1 ]; then
 	# so when it is absent we fall back to the verified mainline sources below.
 	# Those lack the Ubuntu backports, so the build may fail on such kernels.
 
-	if [ -e /usr/src/linux-source-$kernel_version.tar.bz2 ]; then
+	if [ -e "/usr/src/linux-source-$kernel_version.tar.bz2" ]; then
 		use_ubuntu_source=1
 	else
 		echo "linux-source-$kernel_version not found; using mainline kernel $major_version.$minor_version sources from cdn.kernel.org instead"
@@ -219,7 +219,7 @@ fi
 
 if [ $use_ubuntu_source -ge 1 ]; then
 
-	tar --strip-components=2 -xvf /usr/src/linux-source-$kernel_version.tar.bz2 --directory="$build_dir" linux-source-$kernel_version/sound/hda
+	tar --strip-components=2 -xvf "/usr/src/linux-source-$kernel_version.tar.bz2" --directory="$build_dir" "linux-source-$kernel_version/sound/hda"
 
 else
 	# here we assume the distribution kernel source is essentially the mainline kernel source
@@ -229,14 +229,14 @@ else
 	. "$(dirname "$0")/lib/verify_kernel_tarball.sh"
 
 	# a cached tarball is only reused if it verifies; a bad one is deleted so wget -c cannot resume it
-	[[ -f $build_dir/linux-$kernel_version.tar.xz ]] && { verify_kernel_tarball $build_dir/linux-$kernel_version.tar.xz $kernel_version || true; }
+	[[ -f $build_dir/linux-$kernel_version.tar.xz ]] && { verify_kernel_tarball "$build_dir/linux-$kernel_version.tar.xz" "$kernel_version" || true; }
 
 	# attempt to download linux-x.x.x.tar.xz kernel
-	wget -c https://cdn.kernel.org/pub/linux/kernel/v$major_version.x/linux-$kernel_version.tar.xz -P "$build_dir"
+	wget -c "https://cdn.kernel.org/pub/linux/kernel/v$major_version.x/linux-$kernel_version.tar.xz" -P "$build_dir"
 	rc=$?
 
 	if [[ $rc -eq 0 ]]; then
-		verify_kernel_tarball $build_dir/linux-$kernel_version.tar.xz $kernel_version || exit 1
+		verify_kernel_tarball "$build_dir/linux-$kernel_version.tar.xz" "$kernel_version" || exit 1
 	elif [ $mainline_fallback -ge 1 ]; then
 		echo "kernel $UNAME: failed to download linux-$kernel_version.tar.xz...exiting" >&2
 		exit 1
@@ -248,42 +248,42 @@ else
 		echo ""
    		# if first attempt fails, attempt to download linux-x.x.tar.xz kernel
    		kernel_version=$major_version.$minor_version
-   		[[ -f $build_dir/linux-$kernel_version.tar.xz ]] && { verify_kernel_tarball $build_dir/linux-$kernel_version.tar.xz $kernel_version || true; }
-   		wget -c https://cdn.kernel.org/pub/linux/kernel/v$major_version.x/linux-$kernel_version.tar.xz -P "$build_dir"
+   		[[ -f $build_dir/linux-$kernel_version.tar.xz ]] && { verify_kernel_tarball "$build_dir/linux-$kernel_version.tar.xz" "$kernel_version" || true; }
+   		wget -c "https://cdn.kernel.org/pub/linux/kernel/v$major_version.x/linux-$kernel_version.tar.xz" -P "$build_dir"
 		rc=$?
 
 		[[ $rc -ne 0 ]] && echo "kernel could not be downloaded...exiting" >&2 && exit 1
-		verify_kernel_tarball $build_dir/linux-$kernel_version.tar.xz $kernel_version || exit 1
+		verify_kernel_tarball "$build_dir/linux-$kernel_version.tar.xz" "$kernel_version" || exit 1
 	fi
 
 	set -e
 
-	tar --strip-components=2 -xvf "$build_dir"/linux-$kernel_version.tar.xz --directory="$build_dir" linux-$kernel_version/sound/hda
+	tar --strip-components=2 -xvf "$build_dir/linux-$kernel_version.tar.xz" --directory="$build_dir" "linux-$kernel_version/sound/hda"
 
 fi
 
 
-mv $hda_dir/Makefile $hda_dir/Makefile.orig
-mv $hda_dir/common/Makefile $hda_dir/common//Makefile.orig
-mv $hda_dir/codecs/Makefile $hda_dir/codecs//Makefile.orig
-mv $hda_dir/codecs/cirrus/Makefile $hda_dir/codecs/cirrus//Makefile.orig
+mv "$hda_dir/Makefile" "$hda_dir/Makefile.orig"
+mv "$hda_dir/common/Makefile" "$hda_dir/common//Makefile.orig"
+mv "$hda_dir/codecs/Makefile" "$hda_dir/codecs//Makefile.orig"
+mv "$hda_dir/codecs/cirrus/Makefile" "$hda_dir/codecs/cirrus//Makefile.orig"
 
-cp $makefiles_dir/Makefile $hda_dir
-cp $makefiles_dir/Makefile_common $hda_dir/common/Makefile
-cp $makefiles_dir/Makefile_codecs $hda_dir/codecs/Makefile
-cp $makefiles_dir/Makefile_cirrus $hda_dir/codecs/cirrus/Makefile
+cp "$makefiles_dir/Makefile" "$hda_dir"
+cp "$makefiles_dir/Makefile_common" "$hda_dir/common/Makefile"
+cp "$makefiles_dir/Makefile_codecs" "$hda_dir/codecs/Makefile"
+cp "$makefiles_dir/Makefile_cirrus" "$hda_dir/codecs/cirrus/Makefile"
 
 # going with explicit file names now
 
-cp $patch_dir/cirrus_apple.h $hda_dir/codecs/cirrus
-cp $patch_dir/patch_cirrus_boot84.h $hda_dir/codecs/cirrus
-cp $patch_dir/patch_cirrus_new84.h $hda_dir/codecs/cirrus
-cp $patch_dir/patch_cirrus_real84.h $hda_dir/codecs/cirrus
-cp $patch_dir/patch_cirrus_hda_generic_copy.h $hda_dir/codecs/cirrus
-cp $patch_dir/patch_cirrus_real84_i2c.h $hda_dir/codecs/cirrus
+cp "$patch_dir/cirrus_apple.h" "$hda_dir/codecs/cirrus"
+cp "$patch_dir/patch_cirrus_boot84.h" "$hda_dir/codecs/cirrus"
+cp "$patch_dir/patch_cirrus_new84.h" "$hda_dir/codecs/cirrus"
+cp "$patch_dir/patch_cirrus_real84.h" "$hda_dir/codecs/cirrus"
+cp "$patch_dir/patch_cirrus_hda_generic_copy.h" "$hda_dir/codecs/cirrus"
+cp "$patch_dir/patch_cirrus_real84_i2c.h" "$hda_dir/codecs/cirrus"
 
 
-pushd $hda_dir > /dev/null
+pushd "$hda_dir" > /dev/null
 # the gate above guarantees kernel_version >= 6.17: 1 is the implemented
 # version, 2 is later than that
 iscurrent=1
@@ -325,7 +325,7 @@ fi
 
 popd > /dev/null
 
-[[ ! $dkms_action == 'install' ]] && [[ ! -d $update_dir ]] && mkdir $update_dir
+[[ ! $dkms_action == 'install' ]] && [[ ! -d $update_dir ]] && mkdir "$update_dir"
 
 # Skipping patch installation since dkms will do it
 if [[ ! $dkms = true ]]; then
@@ -354,15 +354,15 @@ if [[ ! $dkms = true ]]; then
 		make -C "$repo_dir" install PATCH_CIRRUS=1 || rc=$?
 
 	else
-		make -C "$repo_dir" KERNELRELEASE=$UNAME || rc=$?
+		make -C "$repo_dir" "KERNELRELEASE=$UNAME" || rc=$?
 		check_module_built
-		make -C "$repo_dir" install KERNELRELEASE=$UNAME || rc=$?
+		make -C "$repo_dir" install "KERNELRELEASE=$UNAME" || rc=$?
 
 	fi
 	if [[ $rc -ne 0 ]]; then
 		echo "make failed (exit $rc)" >&2
 	fi
 	echo -e "\ncontents of $update_dir/codecs/cirrus"
-	ls -lA $update_dir/codecs/cirrus || true
+	ls -lA "$update_dir/codecs/cirrus" || true
 	exit "$rc"
 fi
