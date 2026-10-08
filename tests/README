@@ -196,6 +196,65 @@ re-probe. If the codec does not come back, reload the module to recover:
 modprobe -r snd_hda_codec_cs8409 && modprobe snd_hda_codec_cs8409
 ```
 
+### Spec leak on an unknown subsystem id (`cs8409_apple`)
+
+`tests/test_driver_spec_leak.sh` is a *static* check: it proves every early
+exit of `cs8409_apple()` after `cs8409_apple_alloc_spec()` frees the spec (or
+jumps to the `err_free_spec:` label that does). It cannot prove the leak is
+gone -- that needs `kmemleak` on hardware.
+
+Background: `cs8409_apple_alloc_spec()` `kzalloc()`s a
+`struct cs8409_apple_spec` and publishes it as `codec->spec`. On probe failure
+`hda_codec_driver_probe()` (`sound/hda/common/bind.c`) jumps to
+`error_module_put`, which only `module_put()`s the owner -- `driver->ops->remove()`
+is **not** called, so nothing frees `codec->spec`. Before the fix, probing a
+machine whose subsystem id is not in the fixup list (`return -ENODEV`) leaked
+the spec.
+
+Recipe (root, on a machine with the patched module installed and a kernel built
+with `CONFIG_DEBUG_KMEMLEAK=y`):
+
+```sh
+# 1. make sure kmemleak is on and start from a clean slate
+mount | grep -q debugfs || mount -t debugfs none /sys/kernel/debug
+grep -q . /sys/kernel/debug/kmemleak 2>/dev/null && echo scan > /sys/kernel/debug/kmemleak
+echo clear > /sys/kernel/debug/kmemleak
+
+# 2. force a probe of a codec whose subsystem id is NOT in the fixup list,
+#    so cs8409_apple() takes the -ENODEV path (see the re-probe recipe above
+#    for finding the codec address)
+dmesg -C
+echo 0-0 > /sys/bus/hdaudio/devices/hdaudioC0D0/driver/unbind
+echo 0-0 > /sys/bus/hdaudio/devices/hdaudioC0D0/driver/bind
+
+# 3. the driver must have reported the unknown id and refused the codec
+dmesg | grep -i 'UNKNOWN subsystem id'
+
+# 4. let kmemleak settle, then look for the leaked spec
+echo scan > /sys/kernel/debug/kmemleak
+sleep 5
+echo scan > /sys/kernel/debug/kmemleak
+cat /sys/kernel/debug/kmemleak
+```
+
+Pass criteria:
+
+* `dmesg` shows `UNKNOWN subsystem id 0x...` and the probe fails with
+  `-ENODEV` (expected -- the codec is simply unsupported);
+* `/sys/kernel/debug/kmemleak` reports **no** unreferenced object whose
+  allocation stack contains `cs8409_apple_alloc_spec` /
+  `cs8409_apple` / `kzalloc`.
+
+Before the fix, step 4 reported an unreferenced `struct cs8409_apple_spec`
+allocated by `cs8409_apple_alloc_spec()`. Note that kmemleak is conservative:
+a false negative is possible if the freed pointer is still reachable from a
+stale register or stack slot, so treat a clean report as supporting evidence
+rather than proof. Reload the module to recover:
+
+```sh
+modprobe -r snd_hda_codec_cs8409 && modprobe snd_hda_codec_cs8409
+```
+
 ## Kernel source cache
 
 Some tests need a real kernel source tree to patch or inspect. Downloading and
