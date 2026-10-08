@@ -164,7 +164,7 @@ installer_rejects_bad_tarball() {
   HDA_SHIMS=$HDA_SHIMS_SAVED
   assert_ne 0 "$HDA_INSTALLER_RC" "$_script exits non-zero when verification fails"
   assert_contains "$HDA_INSTALLER_OUTPUT" "mismatch" "$_script reports the mismatch"
-  hda_assert_shim_called wget "-P build" "$_script must actually reach the download"
+  hda_assert_shim_called wget "-P $(cd "$HDA_SANDBOX" && pwd)/build" "$_script must actually reach the download"
   assert_eq "" "$(hda_shim_calls tar)" "$_script must not call tar after a failed verification"
   [ ! -e "$HDA_SANDBOX/build/linux-$VERSION.tar.xz" ] && assert_eq 1 1 "tarball deleted" || assert_eq deleted present "$_script tarball deleted"
 }
