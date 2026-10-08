@@ -4,8 +4,11 @@
 # the installers (HDA-11, B2).
 #
 # The kernel tarball must be checked against kernel.org's sha256sums.asc
-# before it is extracted, and any problem must fail closed: non-zero status,
-# an error on stderr, and the tarball deleted so `wget -c` cannot resume it.
+# before it is extracted, and any problem must fail closed: non-zero status
+# and an error on stderr.  Only a hash mismatch deletes the tarball, so that
+# `wget -c` cannot resume a poisoned file; every other failure (missing,
+# ambiguous or unreachable checksum, no hashing tool, ...) leaves the
+# possibly-good tarball in place.
 #
 # `wget` is replaced by a fake that serves a local fixture sums file for
 # `-O <file> <url>` and writes a fixture tarball for `-P <dir> <url>`; `tar`
@@ -106,7 +109,7 @@ test_missing_line_fails() {
   run_verify "$TARBALL" "$VERSION"
   assert_eq 1 "$VERIFY_RC" "no matching line is rejected"
   assert_contains "$VERIFY_ERR" "no checksum" "the error says why"
-  [ ! -e "$TARBALL" ] && assert_eq 1 1 "tarball deleted" || assert_eq deleted present "tarball deleted"
+  assert_file_exists "$TARBALL" "an unverified tarball is not deleted"
 }
 
 test_duplicate_line_fails() {
@@ -115,7 +118,7 @@ test_duplicate_line_fails() {
   run_verify "$TARBALL" "$VERSION"
   assert_eq 1 "$VERIFY_RC" "two matching lines are rejected"
   assert_contains "$VERIFY_ERR" "expected exactly one" "the error says why"
-  [ ! -e "$TARBALL" ] && assert_eq 1 1 "tarball deleted" || assert_eq deleted present "tarball deleted"
+  assert_file_exists "$TARBALL" "an unverified tarball is not deleted"
 }
 
 test_substring_match_fails() {
@@ -125,7 +128,7 @@ test_substring_match_fails() {
   write_sums "$GOOD_SHA  linux-6.17.1.tar.xz" "$GOOD_SHA  linux-6.17.tar.xz.sign"
   run_verify "$WORK/build/linux-6.17.tar.xz" 6.17
   assert_eq 1 "$VERIFY_RC" "a substring-only match is rejected"
-  [ ! -e "$WORK/build/linux-6.17.tar.xz" ] && assert_eq 1 1 "tarball deleted" || assert_eq deleted present "tarball deleted"
+  assert_file_exists "$WORK/build/linux-6.17.tar.xz" "an unverified tarball is not deleted"
 }
 
 test_missing_sums_file_fails() {
@@ -133,7 +136,7 @@ test_missing_sums_file_fails() {
   rm -f "$HDA_FIXTURE_SUMS"
   run_verify "$TARBALL" "$VERSION"
   assert_eq 1 "$VERIFY_RC" "an unreachable sums file is rejected"
-  [ ! -e "$TARBALL" ] && assert_eq 1 1 "tarball deleted" || assert_eq deleted present "tarball deleted"
+  assert_file_exists "$TARBALL" "an unverified tarball is not deleted"
 }
 
 # ---- case 6: the installers ------------------------------------------------

@@ -6,16 +6,18 @@
 #
 # Checks <tarball-path> (linux-<version>.tar.xz) against the SHA-256 that
 # kernel.org publishes in sha256sums.asc.  Fails closed: any problem returns
-# non-zero, prints the reason to stderr and deletes the tarball so that
-# `wget -c` can never resume a poisoned file.
+# non-zero and prints the reason to stderr.  Only a genuine hash mismatch
+# deletes the tarball, so that `wget -c` can never resume a poisoned file;
+# every other failure leaves the (possibly perfectly good) tarball in place.
 #
 # Not covered (follow-up): verifying the GPG signature of sha256sums.asc.  The
 # sums file is fetched over HTTPS, which protects against truncation and
 # on-path tampering but not against a compromised mirror.
 
+# Report a failure and clean up the temporary sums file.  Report-only: the
+# tarball is left alone, because nothing has been learned about its contents.
 _vkt_fail() {
 	echo "verify_kernel_tarball: $1" >&2
-	rm -f -- "$_vkt_tarball"
 	[[ -n $_vkt_sums ]] && rm -f -- "$_vkt_sums"
 	return 1
 }
@@ -74,6 +76,9 @@ verify_kernel_tarball() {
 	fi
 
 	if [[ -z $actual || $actual != "$expected" ]]; then
+		# Deliberate remediation: a corrupt tarball must not be resumable by
+		# `wget -c`, so this is the one path that deletes it.
+		rm -f -- "$_vkt_tarball"
 		_vkt_fail "SHA-256 mismatch for $name: expected ${expected:0:12}..., got ${actual:0:12}...; tarball deleted"
 		return 1
 	fi
