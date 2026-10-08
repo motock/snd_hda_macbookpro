@@ -99,11 +99,6 @@ SHA-256 against kernel.org's `sha256sums.asc` before extracting it. A mismatch
 (or a missing or ambiguous checksum) aborts the install with a non-zero status
 and deletes the tarball. There is no option to skip this check.
 
-The installers also refuse to run `make install` unless the build produced
-`build/hda/codecs/cirrus/snd-hda-codec-cs8409.ko` (or its `.ko.zst` / `.ko.xz`
-form): a missing or empty module aborts the install with a non-zero status that
-names the directory searched.
-
 **building for a specific kernel (KERNELDIR / KERNELRELEASE)**
 
 The top level `Makefile` builds and installs for the running kernel by default.
