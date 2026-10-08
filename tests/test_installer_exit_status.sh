@@ -2,14 +2,15 @@
 #
 # tests/test_installer_exit_status.sh -- the installers must report failure.
 #
-# This file is listed in tests/xfail.list: every case below fails today, on
-# purpose.  It is the red half of HDA-05; B1 (HDA-10) is the fix that turns it
-# green, and the xfail entry must be deleted in that same change.
+# This file is green.  It is the red half of HDA-05; B1 (HDA-10) is the fix
+# that turned it green, and the tests/xfail.list entry for this file was
+# deleted in that same change.  It must stay green: do not re-add an xfail
+# entry, and do not weaken a case to make it pass.
 #
-# What is wrong
-# -------------
-# All three scripts run under `set -e`, but each one ends a failure path with a
-# bare `exit` (or with a command that cannot fail), so a failed install is
+# What was wrong (fixed by HDA-10 / B1)
+# -------------------------------------
+# All three scripts ran under `set -e`, but each one ended a failure path with
+# a bare `exit` (or with a command that cannot fail), so a failed install was
 # reported to the caller as success:
 #
 #   dkms.sh:42-44                  `dkms install ...` then `popd > /dev/null`;
@@ -22,8 +23,8 @@
 #                                  bare `exit` after a successful echo is 0.
 #   install.cirrus.driver.pre617.sh:219  the same.
 #
-# A user who runs the installer, sees it fail and then checks `$?` is told the
-# install worked.  That is the defect these tests pin down.
+# A user who ran the installer, saw it fail and then checked `$?` was told the
+# install worked.  That was the defect these tests pin down.
 #
 # How the scripts are driven
 # ---------------------------
@@ -56,8 +57,9 @@ hda_sandbox_setup > /dev/null || { echo "cannot build the sandbox" >&2; exit 1; 
 # case 1 -- dkms.sh must not swallow a failed `dkms install`
 # ---------------------------------------------------------------------------
 
-# dkms.sh's last command is `popd > /dev/null` (line 44), so the script exits
-# with popd's status no matter what `dkms install` did.
+# dkms.sh's last command used to be `popd > /dev/null` (line 44), so the script
+# exited with popd's status no matter what `dkms install` did.  HDA-10 captures
+# the status of `dkms install` and exits with it.
 test_dkms_sh_dkms_install_failure_exits_nonzero() {
   hda_shim_clear
   hda_shim_rc dkms 1
@@ -71,10 +73,11 @@ test_dkms_sh_dkms_install_failure_exits_nonzero() {
 # case 4 -- the installers' dkms branches must not swallow it either
 # ---------------------------------------------------------------------------
 
-# install.cirrus.driver.sh:65-74 -- `bash dkms.sh` fails, then the branch ends
-# with `ls -lA $update_dir` and a bare `exit`.  The ls shim succeeds (that
-# directory exists on a real install), so the status under test is the
-# installer's own, not ls's.
+# install.cirrus.driver.sh:65-74 -- `bash dkms.sh` fails, then the branch used
+# to end with `ls -lA $update_dir` and a bare `exit`, so the branch exited with
+# ls's status.  The ls shim succeeds (that directory exists on a real install),
+# so the status under test is the installer's own, not ls's.  HDA-10 captures
+# the dkms.sh status into `rc` before the informational ls and exits with it.
 test_new_installer_dkms_install_failure_exits_nonzero() {
   hda_shim_clear
   hda_shim_rc dkms 1
@@ -96,10 +99,10 @@ test_pre617_installer_dkms_install_failure_exits_nonzero() {
   hda_shim_rc_clear dkms
 }
 
-# The remove branches have the same defect: `bash dkms.sh -r` fails, then a
+# The remove branches had the same defect: `bash dkms.sh -r` fails, then a
 # bare `exit` (install.cirrus.driver.sh:80-88, pre617:89-97).  A failed
 # uninstall leaves the user's original kernel module un-restored and still
-# reports success.
+# reported success.  HDA-10 makes both branches exit with the dkms.sh status.
 test_new_installer_dkms_remove_failure_exits_nonzero() {
   hda_shim_clear
   hda_shim_rc dkms 1
@@ -138,10 +141,11 @@ test_pre617_installer_dkms_remove_failure_exits_nonzero() {
 # this story.
 
 # case 2 -- install.cirrus.driver.sh, non-dkms, `make install` fails.
-# Current behaviour: `make install` fails, `set -e` is active, but the script
-# is inside the `if [[ ! $dkms = true ]]` block whose last command is
-# `ls -lA $update_dir` (line 318) -- and the bare `exit` at line 203 is on the
-# download path, after an `echo` that succeeds.
+# What was wrong (fixed by HDA-10): `make install` failed, `set -e` was active,
+# but the script was inside the `if [[ ! $dkms = true ]]` block whose last
+# command was `ls -lA $update_dir` (line 318) -- and the bare `exit` at line 203
+# was on the download path, after an `echo` that succeeds.  HDA-10 captures the
+# `make install` status into `rc` before any echo or ls and exits with it.
 test_new_installer_make_install_failure_exits_nonzero() {
   _blocker=$(hda_non_dkms_blocker "$NEW_UNAME")
   if [ -n "$_blocker" ]; then
@@ -174,9 +178,10 @@ test_pre617_installer_make_install_failure_exits_nonzero() {
 }
 
 # case 6a -- the kernel-source download fails twice: `wget` fails, then the
-# retry fails, and the script takes the `exit` at install.cirrus.driver.sh:203
-# (pre617:219).  That `exit` is bare, but it follows `echo ... && exit`, and
-# the echo succeeds, so the script exits 0.
+# retry fails, and the script used to take the `exit` at
+# install.cirrus.driver.sh:203 (pre617:219).  That `exit` was bare, but it
+# followed `echo ... && exit`, and the echo succeeds, so the script exited 0.
+# HDA-10 makes that path exit 1 with the reason on stderr.
 test_new_installer_wget_failure_exits_nonzero() {
   _blocker=$(hda_non_dkms_blocker "$NEW_UNAME")
   if [ -n "$_blocker" ]; then
@@ -209,7 +214,7 @@ test_pre617_installer_wget_failure_exits_nonzero() {
 
 # case 6b -- the download succeeds but the archive cannot be unpacked: `tar`
 # fails at install.cirrus.driver.sh:208 (pre617:224) with `set -e` active, so
-# this one is expected to exit non-zero today.  It is here as the negative
+# this one already exited non-zero before HDA-10.  It is here as the negative
 # control for the wget case above: it shows the harness can observe a failure
 # the installer does report, which is what makes the wget case's exit 0
 # meaningful rather than an artefact of the sandbox.
