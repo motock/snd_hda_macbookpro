@@ -120,6 +120,18 @@ else
   ok "no memset()/handler call between a lock and its unlock in $NEW84"
 fi
 
+# (e) The lock must be initialised where the queue is set up, or a
+# CONFIG_DEBUG_SPINLOCK/lockdep kernel reports a bad-magic/unregistered key.
+# Each installer path copies one of these headers, so both need the init.
+for f in patch_cirrus/cirrus_apple.h patch_cirrus/patch_cirrus_apple.h; do
+  if grep -A1 'INIT_LIST_HEAD(&spec->unsol_list);' "$f" \
+       | grep -q 'spin_lock_init(&spec->unsol_lock);'; then
+    ok "$f initialises unsol_lock next to the queue head"
+  else
+    bad "$f does not call spin_lock_init(&spec->unsol_lock) after INIT_LIST_HEAD(&spec->unsol_list)"
+  fi
+done
+
 # ---------------------------------------------------------------------------
 # (d) the hook-apply test still passes for both pinned trees
 # ---------------------------------------------------------------------------

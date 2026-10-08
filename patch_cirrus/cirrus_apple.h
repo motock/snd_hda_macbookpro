@@ -2904,6 +2904,7 @@ static int cs8409_apple(struct hda_codec *codec)
         spec->block_unsol = 0;
 
         INIT_LIST_HEAD(&spec->unsol_list);
+        spin_lock_init(&spec->unsol_lock);
 
         for (itm=0; itm<10; itm++)
                 { spec->unsol_items_prealloc_used[itm] = 0; }
