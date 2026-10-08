@@ -4,9 +4,10 @@
 # tests/test_installer_exit_status.sh.
 #
 # The failure-reporting tests live in their own file because the runner is
-# per-file: that file is in tests/xfail.list (every case in it fails until B1 /
-# HDA-10 lands), and an xfail entry marks the *whole file*.  These controls must
-# stay green today, so they cannot share a file with it.
+# per-file: that file was in tests/xfail.list while every case in it failed
+# (before B1 / HDA-10 landed), and an xfail entry marks the *whole file*.  The
+# entry is now gone and that file is green; these controls must stay green too,
+# so they still cannot share a file with it.
 #
 # What is controlled
 # ------------------

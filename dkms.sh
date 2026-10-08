@@ -21,6 +21,11 @@ if [[ $dkms_remove = true ]]; then
     # before we remove the whole /var/lib/dkms/snd_hda_macbookpro directory tree below
     # (which we dont need to do if we do the dkms remove)
     dkms remove $dkms_name
+    rc=$?
+    if [[ $rc -ne 0 ]]; then
+        echo "dkms remove failed for $dkms_name (exit $rc)" >&2
+        exit "$rc"
+    fi
 
     # we dont need this if we do the above - the whole dkms module tree is removed by the above command
     # (in addition to restoring the original module)
@@ -33,6 +38,11 @@ if [[ $dkms_remove = true ]]; then
 fi
 
 pushd $cur_dir > /dev/null
+rc=$?
+if [[ $rc -ne 0 ]]; then
+    echo "cannot enter $cur_dir (exit $rc)" >&2
+    exit "$rc"
+fi
 
 # create the symbolic link for source dkms seems to require
 [[ ! -e $src_dir ]] && ln -sfn $cur_dir $src_dir
@@ -40,5 +50,12 @@ pushd $cur_dir > /dev/null
 # note that this will store the original base kernel module under  /var/lib/dkms
 # and needs dkms remove to be called to restore that original module back to the base kernel modules
 dkms install -c dkms.conf --force -m $dkms_name
+rc=$?
 
 popd > /dev/null
+
+if [[ $rc -ne 0 ]]; then
+    echo "dkms install failed for $dkms_name (exit $rc)" >&2
+fi
+
+exit "$rc"
