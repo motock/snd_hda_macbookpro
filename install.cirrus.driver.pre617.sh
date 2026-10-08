@@ -332,13 +332,32 @@ if [[ ! $dkms = true ]]; then
 
 	echo "DKMS FALSE DONE"
 
+	# The module must exist before it is installed: `make` can exit 0 without
+	# producing one (a skipped object, a stale tree), and `make install` would
+	# then install nothing while reporting success.  The name comes from the
+	# Makefile's object list (makefiles/Makefile_cirrus, patch_cirrus/Makefile);
+	# the kernel may leave it uncompressed or compress it with zstd/xz.
+	check_module_built() {
+		_module_dir="$hda_dir/codecs/cirrus"
+		_module_name=snd-hda-codec-cs8409
+		for _ext in ko ko.zst ko.xz; do
+			if [ -s "$_module_dir/$_module_name.$_ext" ]; then
+				return 0
+			fi
+		done
+		echo "error: $_module_name.{ko,ko.zst,ko.xz} not found (or empty) in $_module_dir after build" >&2
+		exit 1
+	}
+
 	rc=0
 	if [ $PATCH_CIRRUS = true ]; then
 		make PATCH_CIRRUS=1 || rc=$?
+		check_module_built
 		make install PATCH_CIRRUS=1 || rc=$?
 
 	else
 		make KERNELRELEASE=$UNAME || rc=$?
+		check_module_built
 		make install KERNELRELEASE=$UNAME || rc=$?
 
 	fi
