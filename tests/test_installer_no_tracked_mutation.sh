@@ -167,75 +167,174 @@ assert_file_absent() {
   return 1
 }
 
+# case_done <label> <failures_before> -- one PASS/FAIL line per case, so a run
+# reports what it checked.  <failures_before> is $HDA_ASSERT_FAILURES captured
+# at the start of the case.
+case_done() {
+  if [ "${HDA_ASSERT_FAILURES:-0}" -eq "$2" ]; then
+    printf 'PASS: %s\n' "$1"
+  else
+    printf 'FAIL: %s\n' "$1"
+  fi
+  return 0
+}
+
 # ---------------------------------------------------------------------------
 # case 1: pre-6.17 installer, 5.19 -- module name snd-hda-codec-cs8409
 # ---------------------------------------------------------------------------
 
-hda_installer_run install.cirrus.driver.pre617.sh -i -d -k "$OLD_UNAME"
+test_pre617_519_leaves_checkout_clean() {
+  _failures_before=$HDA_ASSERT_FAILURES
+  hda_installer_run install.cirrus.driver.pre617.sh -i -d -k "$OLD_UNAME"
 
-assert_eq 0 "$HDA_INSTALLER_RC" \
-  "pre617 installer must exit 0 with all shims succeeding (output: $(hda_installer_output_oneline))"
-assert_clean "pre617 5.19"
+  assert_eq 0 "$HDA_INSTALLER_RC" \
+    "pre617 5.19: installer must exit 0 with all shims succeeding (output: $(hda_installer_output_oneline))"
+  assert_clean "pre617 5.19"
+  assert_no_stale_staging "pre617 5.19"
 
-# A second run in the same checkout must behave identically: the old
-# `sed -i.orig` left dkms.conf.orig behind, which flipped the script onto its
-# other sed branch on the next run.
-hda_installer_run install.cirrus.driver.pre617.sh -i -d -k "$OLD_UNAME"
+  # A second run in the same checkout must behave identically: the old
+  # `sed -i.orig` left dkms.conf.orig behind, which flipped the script onto its
+  # other sed branch on the next run.
+  hda_installer_run install.cirrus.driver.pre617.sh -i -d -k "$OLD_UNAME"
 
-assert_eq 0 "$HDA_INSTALLER_RC" \
-  "pre617 installer must exit 0 on a repeat run (output: $(hda_installer_output_oneline))"
-assert_clean "pre617 5.19 (repeat)"
+  assert_eq 0 "$HDA_INSTALLER_RC" \
+    "pre617 5.19 (repeat): installer must exit 0 on a repeat run (output: $(hda_installer_output_oneline))"
+  assert_clean "pre617 5.19 (repeat)"
+  assert_no_stale_staging "pre617 5.19 (repeat)"
 
-assert_file_exists "$HDA_DKMS_CONF_CAPTURE" "dkms must have been pointed at a dkms.conf"
-staged=$(cat "$HDA_DKMS_CONF_CAPTURE" 2>/dev/null || true)
-assert_contains "$staged" 'BUILT_MODULE_NAME[0]="snd-hda-codec-cs8409"' \
-  "staged dkms.conf must carry the 5.19 module name"
-assert_contains "$staged" 'BUILT_MODULE_LOCATION[0]="build/hda"' \
-  "staged dkms.conf must carry the pre-6.17 module location"
-assert_contains "$staged" 'PRE_BUILD="install.cirrus.driver.pre617.sh -k $kernelver --dkms"' \
-  "staged dkms.conf must carry the pre-6.17 PRE_BUILD"
+  # dkms must have been pointed at a staged COPY carrying the edited values,
+  # never at the tracked $repo/dkms.conf; the copy is removed on exit.
+  assert_file_exists "$HDA_DKMS_CONF_CAPTURE" "dkms must have been pointed at a dkms.conf"
+  staged=$(cat "$HDA_DKMS_CONF_CAPTURE" 2>/dev/null || true)
+  assert_contains "$staged" 'PACKAGE_NAME="snd_hda_macbookpro"' \
+    "staged dkms.conf must be a copy of the repo config"
+  assert_contains "$staged" 'BUILT_MODULE_NAME[0]="snd-hda-codec-cs8409"' \
+    "staged dkms.conf must carry the 5.19 module name"
+  assert_contains "$staged" 'BUILT_MODULE_LOCATION[0]="build/hda"' \
+    "staged dkms.conf must carry the pre-6.17 module location"
+  assert_contains "$staged" 'PRE_BUILD="install.cirrus.driver.pre617.sh -k $kernelver --dkms"' \
+    "staged dkms.conf must carry the pre-6.17 PRE_BUILD"
 
-staged_path=$(cat "$HDA_DKMS_CONF_PATH" 2>/dev/null || true)
-assert_not_contains "$staged_path" "$sandbox" \
-  "dkms must be pointed at a staged copy, not the checkout"
+  staged_path=$(cat "$HDA_DKMS_CONF_PATH" 2>/dev/null || true)
+  assert_ne "$sandbox/dkms.conf" "$staged_path" \
+    "dkms must be pointed at a staged copy, not the tracked repo dkms.conf"
+  assert_not_contains "$staged_path" "$sandbox" \
+    "the staged dkms.conf must live outside the checkout"
+  assert_file_absent "$staged_path" \
+    "the staged dkms.conf must be removed when the installer exits"
+  case_done "pre617 5.19 (two runs)" "$_failures_before"
+}
 
 # ---------------------------------------------------------------------------
 # case 2: pre-6.17 installer, 5.12 -- module name snd-hda-codec-cirrus
 # ---------------------------------------------------------------------------
 
-reset_sandbox
-: > "$HDA_DKMS_CONF_CAPTURE"
-: > "$HDA_DKMS_CONF_PATH"
+test_pre617_512_leaves_checkout_clean() {
+  _failures_before=$HDA_ASSERT_FAILURES
+  reset_sandbox
+  : > "$HDA_DKMS_CONF_CAPTURE"
+  : > "$HDA_DKMS_CONF_PATH"
 
-hda_installer_run install.cirrus.driver.pre617.sh -i -d -k "$ANCIENT_UNAME"
+  hda_installer_run install.cirrus.driver.pre617.sh -i -d -k "$ANCIENT_UNAME"
 
-assert_eq 0 "$HDA_INSTALLER_RC" \
-  "pre617 installer must exit 0 for 5.12 (output: $(hda_installer_output_oneline))"
-assert_clean "pre617 5.12"
+  assert_eq 0 "$HDA_INSTALLER_RC" \
+    "pre617 5.12: installer must exit 0 (output: $(hda_installer_output_oneline))"
+  assert_clean "pre617 5.12"
+  assert_no_stale_staging "pre617 5.12"
 
-staged=$(cat "$HDA_DKMS_CONF_CAPTURE" 2>/dev/null || true)
-assert_contains "$staged" 'BUILT_MODULE_NAME[0]="snd-hda-codec-cirrus"' \
-  "staged dkms.conf must carry the 5.12 module name"
+  staged=$(cat "$HDA_DKMS_CONF_CAPTURE" 2>/dev/null || true)
+  assert_contains "$staged" 'BUILT_MODULE_NAME[0]="snd-hda-codec-cirrus"' \
+    "staged dkms.conf must carry the 5.12 module name"
+  assert_contains "$staged" 'BUILT_MODULE_LOCATION[0]="build/hda"' \
+    "staged dkms.conf must carry the pre-6.17 module location"
+  assert_contains "$staged" 'PRE_BUILD="install.cirrus.driver.pre617.sh -k $kernelver --dkms"' \
+    "staged dkms.conf must carry the pre-6.17 PRE_BUILD"
+
+  staged_path=$(cat "$HDA_DKMS_CONF_PATH" 2>/dev/null || true)
+  assert_ne "$sandbox/dkms.conf" "$staged_path" \
+    "dkms must be pointed at a staged copy, not the tracked repo dkms.conf"
+  assert_file_absent "$staged_path" \
+    "the staged dkms.conf must be removed when the installer exits"
+  case_done "pre617 5.12" "$_failures_before"
+}
 
 # ---------------------------------------------------------------------------
 # case 3: >= 6.17 installer -- edits nothing, so dkms sees the tracked config
 # ---------------------------------------------------------------------------
 
-reset_sandbox
-: > "$HDA_DKMS_CONF_CAPTURE"
-: > "$HDA_DKMS_CONF_PATH"
+test_617_leaves_checkout_clean() {
+  _failures_before=$HDA_ASSERT_FAILURES
+  reset_sandbox
+  : > "$HDA_DKMS_CONF_CAPTURE"
+  : > "$HDA_DKMS_CONF_PATH"
 
-hda_installer_run install.cirrus.driver.sh -i -d -k "$NEW_UNAME"
+  hda_installer_run install.cirrus.driver.sh -i -d -k "$NEW_UNAME"
 
-assert_eq 0 "$HDA_INSTALLER_RC" \
-  "6.17 installer must exit 0 with all shims succeeding (output: $(hda_installer_output_oneline))"
-assert_clean "6.17"
+  assert_eq 0 "$HDA_INSTALLER_RC" \
+    "6.17 installer must exit 0 with all shims succeeding (output: $(hda_installer_output_oneline))"
+  assert_clean "6.17"
 
-assert_eq "$tracked_before" "$(cat "$HDA_DKMS_CONF_CAPTURE" 2>/dev/null || true)" \
-  "6.17 installer must hand dkms the tracked dkms.conf unedited"
+  assert_eq "$tracked_before" "$(cat "$HDA_DKMS_CONF_CAPTURE" 2>/dev/null || true)" \
+    "6.17 installer must hand dkms the tracked dkms.conf unedited"
+  case_done "6.17" "$_failures_before"
+}
 
-# The staging directory must not survive the run (trap ... EXIT).
-stale=$(find "${TMPDIR:-/tmp}" -maxdepth 1 -name 'snd-hda-dkms.*' 2>/dev/null | head -1)
-assert_eq "" "$stale" "installer must remove its staging directory on exit"
+# ---------------------------------------------------------------------------
+# case 4: pre-6.17 installer with `dkms install` failing -- the failure must be
+# reported, the checkout must still be byte-identical, and the staging dir
+# must still be removed (the trap ... EXIT fires on failure too)
+# ---------------------------------------------------------------------------
+
+test_pre617_failed_install_leaves_checkout_clean() {
+  _failures_before=$HDA_ASSERT_FAILURES
+  reset_sandbox
+  : > "$HDA_DKMS_CONF_CAPTURE"
+  : > "$HDA_DKMS_CONF_PATH"
+
+  hda_shim_rc dkms 1
+  hda_installer_run install.cirrus.driver.pre617.sh -i -d -k "$OLD_UNAME"
+  hda_shim_rc_clear dkms
+
+  assert_ne 0 "$HDA_INSTALLER_RC" \
+    "pre617 5.19 (failed install): the installer must report the dkms failure"
+  assert_clean "pre617 5.19 (failed install)"
+  assert_no_stale_staging "pre617 5.19 (failed install)"
+
+  staged_path=$(cat "$HDA_DKMS_CONF_PATH" 2>/dev/null || true)
+  assert_ne "$sandbox/dkms.conf" "$staged_path" \
+    "failed install: dkms must not be pointed at the tracked repo dkms.conf"
+  assert_file_absent "$staged_path" \
+    "failed install: the staged dkms.conf must be removed even when the install fails"
+  case_done "pre617 5.19 (failed install)" "$_failures_before"
+}
+
+# ---------------------------------------------------------------------------
+# case 5: pre-6.17 installer, remove branch -- the old edits ran before the
+# action branch, so a remove run dirtied the checkout too; it must leave the
+# checkout byte-identical
+# ---------------------------------------------------------------------------
+
+test_pre617_remove_leaves_checkout_clean() {
+  _failures_before=$HDA_ASSERT_FAILURES
+  reset_sandbox
+
+  hda_installer_run install.cirrus.driver.pre617.sh -r -d -k "$OLD_UNAME"
+
+  assert_eq 0 "$HDA_INSTALLER_RC" \
+    "pre617 5.19 (remove): installer must exit 0 with all shims succeeding (output: $(hda_installer_output_oneline))"
+  assert_clean "pre617 5.19 (remove)"
+  assert_no_stale_staging "pre617 5.19 (remove)"
+  case_done "pre617 5.19 (remove)" "$_failures_before"
+}
+
+# ---------------------------------------------------------------------------
+# run
+# ---------------------------------------------------------------------------
+
+test_pre617_519_leaves_checkout_clean
+test_pre617_512_leaves_checkout_clean
+test_617_leaves_checkout_clean
+test_pre617_failed_install_leaves_checkout_clean
+test_pre617_remove_leaves_checkout_clean
 
 finish
