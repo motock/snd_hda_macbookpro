@@ -1752,14 +1752,6 @@ void cs_8409_cs42l83_jack_unsol_event(struct hda_codec *codec, unsigned int res)
 
 void cs_8409_apple_remove(struct hda_codec *codec)
 {
-#if 0
-        struct cs8409_spec *spec = codec->spec;
-
-        /* Cancel i2c clock disable timer, and disable clock if left enabled */
-        cancel_delayed_work_sync(&spec->i2c_clk_work);
-        cs8409_disable_i2c_clock(codec);
-#endif
-
 	//del_timer(&cs_8409_hp_timer);
 
 	snd_hda_gen_remove(codec);
@@ -1768,7 +1760,29 @@ void cs_8409_apple_remove(struct hda_codec *codec)
 
 // note this must come after any function definitions used
 
+// cs8409_apple() below overwrites driver->ops with this table, so it must
+// carry the probe the driver was registered with.  hda_codec_driver_probe()
+// (sound/hda/common/bind.c) does
+//     if (WARN_ON(!(driver->ops && driver->ops->probe))) return -EINVAL;
+//     err = driver->ops->probe(codec, codec->preset);
+// so a table without .probe makes the *next* probe of this codec (unbind then
+// bind, or a module reload) fail with -EINVAL and a WARN_ON splat.
+//
+// The original probe is the kernel's own cs8409_probe, and it is in scope
+// here: the hook that pulls this file in (patch_cs8409.c.diff) inserts
+// `#include "cirrus_apple.h"` into cs8409.c after cs8409_probe's definition.
+// Naming it directly is preferred over saving the old pointer in a file-static
+// and calling it through a wrapper: it is the same function, it is visible at
+// this point, and the table stays self-describing.
+//
+// .probe only exists in struct hda_codec_ops from 6.17 on -- before that the
+// probe came from codec->preset->driver_data and struct hda_codec_driver had
+// no .ops at all -- hence the version guard.  The < 6.17 branch of
+// cs8409_apple() assigns codec->patch_ops and is unaffected either way.
 static const struct hda_codec_ops cs_8409_apple_ops = {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0)
+	.probe = cs8409_probe,
+#endif
 	.build_controls = cs_8409_apple_build_controls,
 	.build_pcms = cs_8409_apple_build_pcms,
 	.init = cs_8409_apple_init,
@@ -2597,10 +2611,6 @@ static struct cs8409_apple_spec *cs8409_apple_alloc_spec(struct hda_codec *codec
 	//codec->power_save_node = 1;
 	// looks like we need an explicit set - 1 maybe default
 	codec->power_save_node = 0;
-#if 0
-        mutex_init(&spec->i2c_mux);
-        INIT_DELAYED_WORK(&spec->i2c_clk_work, cs8409_disable_i2c_clock_worker);
-#endif
 	snd_hda_gen_spec_init(&spec->gen);
 
 	return spec;
@@ -2618,13 +2628,10 @@ static int cs8409_apple(struct hda_codec *codec)
         const struct hda_pincfg *pin;
         int fixup_found = 0;
 
-        int explicit = 0;
-
         //struct hda_pcm *info = NULL;
         //struct hda_pcm_stream *hinfo = NULL;
 
-        myprintk("snd_hda_intel: Patching for CS8409 Apple - explicit %d\n", explicit);
-        //mycodec_info(codec, "Patching for CS8409 Apple - %d\n", explicit);
+        myprintk("snd_hda_intel: Patching for CS8409 Apple\n");
 
         //dump_stack();
 
@@ -2717,23 +2724,13 @@ static int cs8409_apple(struct hda_codec *codec)
 
 	//codec->ops = cs8409_cs42l83_ops;
 
-        if (explicit)
-               {
-               //driver->ops = &cs_8409_apple_ops_explicit;
-               }
-        else
-               driver->ops = &cs_8409_apple_ops;
+        driver->ops = &cs_8409_apple_ops;
 
 #else
 
 	//codec->patch_ops = cs8409_cs42l83_ops;
 
-        if (explicit)
-               {
-               //codec->patch_ops = cs_8409_apple_ops_explicit;
-               }
-        else
-               codec->patch_ops = cs_8409_apple_ops;
+        codec->patch_ops = cs_8409_apple_ops;
 
 #endif
 
@@ -2876,23 +2873,13 @@ static int cs8409_apple(struct hda_codec *codec)
 
         driver = hda_codec_to_driver(codec);
 
-        if (explicit)
-               {
-               //driver->ops = &cs_8409_apple_ops_explicit;
-               }
-        else
-               driver->ops = &cs_8409_apple_ops;
+        driver->ops = &cs_8409_apple_ops;
 
 #else
 
 	//codec->patch_ops = cs8409_cs42l83_ops;
 
-        if (explicit)
-               {
-               //codec->patch_ops = cs_8409_apple_ops_explicit;
-               }
-        else
-               codec->patch_ops = cs_8409_apple_ops;
+        codec->patch_ops = cs_8409_apple_ops;
 
 #endif
 
@@ -3058,19 +3045,15 @@ static int cs8409_apple(struct hda_codec *codec)
 
         // so it appears we dont get interrupts in the auto config stage
 
-       if (!explicit)
-       {
+        myprintk("snd_hda_intel: pre cs_8409_apple_parse_auto_config\n");
 
-              myprintk("snd_hda_intel: pre cs_8409_apple_parse_auto_config\n");
+        err = cs_8409_apple_parse_auto_config(codec);
+        if (err < 0)
+                goto error;
 
-              err = cs_8409_apple_parse_auto_config(codec);
-              if (err < 0)
-                      goto error;
+        myprintk("snd_hda_intel: post cs_8409_apple_parse_auto_config\n");
 
-              myprintk("snd_hda_intel: post cs_8409_apple_parse_auto_config\n");
-
-              cs_8409_dump_auto_config(codec, "post cs_8409_apple_parse_auto_config");
-       }
+        cs_8409_dump_auto_config(codec, "post cs_8409_apple_parse_auto_config");
 
 
        // dump the rates/format of the afg node
