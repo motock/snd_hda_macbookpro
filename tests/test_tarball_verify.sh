@@ -106,7 +106,7 @@ test_missing_line_fails() {
   run_verify "$TARBALL" "$VERSION"
   assert_eq 1 "$VERIFY_RC" "no matching line is rejected"
   assert_contains "$VERIFY_ERR" "no checksum" "the error says why"
-  [ ! -e "$TARBALL" ] && assert_eq 1 1 "tarball deleted" || assert_eq deleted present "tarball deleted"
+  assert_file_exists "$TARBALL" "an unverified tarball is not deleted"
 }
 
 test_duplicate_line_fails() {
@@ -115,7 +115,7 @@ test_duplicate_line_fails() {
   run_verify "$TARBALL" "$VERSION"
   assert_eq 1 "$VERIFY_RC" "two matching lines are rejected"
   assert_contains "$VERIFY_ERR" "expected exactly one" "the error says why"
-  [ ! -e "$TARBALL" ] && assert_eq 1 1 "tarball deleted" || assert_eq deleted present "tarball deleted"
+  assert_file_exists "$TARBALL" "an unverified tarball is not deleted"
 }
 
 test_substring_match_fails() {
@@ -125,7 +125,7 @@ test_substring_match_fails() {
   write_sums "$GOOD_SHA  linux-6.17.1.tar.xz" "$GOOD_SHA  linux-6.17.tar.xz.sign"
   run_verify "$WORK/build/linux-6.17.tar.xz" 6.17
   assert_eq 1 "$VERIFY_RC" "a substring-only match is rejected"
-  [ ! -e "$WORK/build/linux-6.17.tar.xz" ] && assert_eq 1 1 "tarball deleted" || assert_eq deleted present "tarball deleted"
+  assert_file_exists "$WORK/build/linux-6.17.tar.xz" "an unverified tarball is not deleted"
 }
 
 test_missing_sums_file_fails() {
@@ -133,7 +133,7 @@ test_missing_sums_file_fails() {
   rm -f "$HDA_FIXTURE_SUMS"
   run_verify "$TARBALL" "$VERSION"
   assert_eq 1 "$VERIFY_RC" "an unreachable sums file is rejected"
-  [ ! -e "$TARBALL" ] && assert_eq 1 1 "tarball deleted" || assert_eq deleted present "tarball deleted"
+  assert_file_exists "$TARBALL" "an unverified tarball is not deleted"
 }
 
 # ---- case 6: the installers ------------------------------------------------
