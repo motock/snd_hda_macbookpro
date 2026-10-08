@@ -22,7 +22,8 @@
 #      is skipped when no C preprocessor is installed).
 #   B6 the edit is still just line 1, even for the large header: relative to
 #      the pre-story tree, each deliverable gains exactly one line and loses
-#      or modifies none.
+#      or modifies none (patch_cirrus_new84.h alone is exempt from the size
+#      check; see the B6 block).
 #
 # The fixtures below are the negative controls: they prove each check detects
 # bad input instead of passing vacuously.
@@ -235,15 +236,27 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# B6 -- the SPDX line is present in every deliverable, even the large header.
+# B6 -- the edit is still just line 1, even for the large header: relative to
+# the pre-story tree (the commit that introduced this test file), each
+# deliverable gains exactly one line and loses or modifies none.
 #
-# This used to assert that the diff from the pre-story tree was exactly +1/-0
-# lines.  That pinned the *total* diff size of each deliverable measured from
-# before the SPDX story, so it broke on every later legitimate edit to the same
-# file (e.g. the HDA-20 unsol-queue locking rewrite of patch_cirrus_new84.h).
-# The property the story actually cared about is that the SPDX comment is
-# there, so assert that instead.
+# Narrow exemption: HDA-20 legitimately rewrites the unsol-queue locking in
+# patch_cirrus_new84.h, so that one file can no longer be +1/-0 against the
+# pre-story tree.  It is only required to still carry the SPDX line among its
+# added lines.  Every other deliverable keeps the exact +1/-0 check.
 # ---------------------------------------------------------------------------
+
+B6_SIZE_EXEMPT=("patch_cirrus/patch_cirrus_new84.h")
+
+# The exemption must not grow silently.
+assert_eq "1" "${#B6_SIZE_EXEMPT[@]}" "B6: exactly one deliverable may be exempt from the +1/-0 size check"
+assert_eq "patch_cirrus/patch_cirrus_new84.h" "${B6_SIZE_EXEMPT[0]}" "B6: the only size-exempt deliverable is patch_cirrus_new84.h"
+
+# Negative control: a non-exempt deliverable with an extra added line must
+# still fail the +1/-0 check, i.e. the counting below sees 2 added lines.
+_b6_fixture_diff=$(printf '%s\n' '--- a/x.h' '+++ b/x.h' '+/* SPDX-License-Identifier: GPL-2.0 */' '+int sneaked_in;')
+_b6_fixture_adds=$(printf '%s\n' "$_b6_fixture_diff" | grep -c '^+[^+]')
+assert_eq "2" "$_b6_fixture_adds" "B6 control: an extra added line is counted, so the +1 check would fail it"
 
 # The pre-story tree is the PARENT of the commit that introduced this test
 # file.  The test file and the batch-2 header edits landed in the same commit,
@@ -257,8 +270,18 @@ if [ -z "$BASE" ]; then
   assert_eq "found" "not found" "B6: cannot locate the pre-story base commit (tests/test_spdx_batch2.sh must be committed)"
 else
   for _h in "${DELIVERABLES[@]}"; do
-    _added=$(git diff "$BASE" -- "$_h" | grep '^+[^+]' | sed 's/^+//')
-    assert_contains "$_added" "SPDX-License-Identifier" "$_h: B6: the SPDX comment must be present"
+    _d=$(git diff "$BASE" -- "$_h")
+    if [ "$_h" = "${B6_SIZE_EXEMPT[0]}" ]; then
+      _added=$(printf '%s\n' "$_d" | grep '^+[^+]' | sed 's/^+//')
+      assert_contains "$_added" "SPDX-License-Identifier" "$_h: B6: the SPDX comment must be present"
+      continue
+    fi
+    _adds=$(printf '%s\n' "$_d" | grep -c '^+[^+]')
+    _dels=$(printf '%s\n' "$_d" | grep -c '^-[^-]')
+    assert_eq "1" "$_adds" "$_h: B6: the story edit must add exactly one line"
+    assert_eq "0" "$_dels" "$_h: B6: the story edit must not remove or modify any line"
+    _added=$(printf '%s\n' "$_d" | grep '^+[^+]' | sed 's/^+//')
+    assert_contains "$_added" "SPDX-License-Identifier" "$_h: B6: the single added line must be the SPDX comment"
   done
 fi
 

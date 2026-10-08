@@ -160,8 +160,9 @@ done
 #   * every remaining failure must be the known offset drift.
 # Any other failure -- a .rej, a malformed patch, an orphan hook -- is a
 # regression and fails this guard.
-if [ -f tests/test_hooks_apply.sh ]; then
-  hooks_log=$(mktemp 2>/dev/null || printf '/tmp/hda20_hooks.%s' "$$")
+if [ -f tests/test_hooks_apply.sh ] && ! hooks_log=$(mktemp); then
+  bad "cannot create a temporary file for the hooks-apply log"
+elif [ -f tests/test_hooks_apply.sh ]; then
   bash tests/test_hooks_apply.sh >"$hooks_log" 2>&1
   hooks_rc=$?
   if [ "$hooks_rc" -eq 0 ]; then

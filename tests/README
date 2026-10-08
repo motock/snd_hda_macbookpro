@@ -417,6 +417,13 @@ relative to the other locks in the codec. Kernel code cannot be unit-run here,
 so the absence of a data race is only ever demonstrated on hardware, with a
 kernel built with lockdep and KCSAN enabled.
 
+### Known limitation
+
+`block_unsol` is read and written outside `unsol_lock`, so an event enqueued
+while a drain is finishing can be left queued until the next unsolicited
+event. That is a delayed event, not memory corruption, and this behaviour
+predates the lock.
+
 ### Manual validation recipe (needs the hardware)
 
 Run this on a MacBook with the CS8409/CS42L83 codec, on a kernel built with
