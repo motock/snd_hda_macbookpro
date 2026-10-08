@@ -235,9 +235,14 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# B6 -- the edit is still just line 1, even for the large header: relative to
-# the pre-story tree (the commit that introduced this test file), each
-# deliverable gains exactly one line and loses or modifies none.
+# B6 -- the SPDX line is present in every deliverable, even the large header.
+#
+# This used to assert that the diff from the pre-story tree was exactly +1/-0
+# lines.  That pinned the *total* diff size of each deliverable measured from
+# before the SPDX story, so it broke on every later legitimate edit to the same
+# file (e.g. the HDA-20 unsol-queue locking rewrite of patch_cirrus_new84.h).
+# The property the story actually cared about is that the SPDX comment is
+# there, so assert that instead.
 # ---------------------------------------------------------------------------
 
 # The pre-story tree is the PARENT of the commit that introduced this test
@@ -252,13 +257,8 @@ if [ -z "$BASE" ]; then
   assert_eq "found" "not found" "B6: cannot locate the pre-story base commit (tests/test_spdx_batch2.sh must be committed)"
 else
   for _h in "${DELIVERABLES[@]}"; do
-    _d=$(git diff "$BASE" -- "$_h")
-    _adds=$(printf '%s\n' "$_d" | grep -c '^+[^+]')
-    _dels=$(printf '%s\n' "$_d" | grep -c '^-[^-]')
-    assert_eq "1" "$_adds" "$_h: B6: the story edit must add exactly one line"
-    assert_eq "0" "$_dels" "$_h: B6: the story edit must not remove or modify any line"
-    _added=$(printf '%s\n' "$_d" | grep '^+[^+]' | sed 's/^+//')
-    assert_contains "$_added" "SPDX-License-Identifier" "$_h: B6: the single added line must be the SPDX comment"
+    _added=$(git diff "$BASE" -- "$_h" | grep '^+[^+]' | sed 's/^+//')
+    assert_contains "$_added" "SPDX-License-Identifier" "$_h: B6: the SPDX comment must be present"
   done
 fi
 

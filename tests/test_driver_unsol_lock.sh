@@ -7,7 +7,10 @@
 # bookkeeping) is shared between the unsolicited-event work item (enqueue) and
 # the drain paths.  This test is a *structural* guard.  It proves:
 #
-#   (a) both codec-spec header diffs declare `spinlock_t unsol_lock;`
+#   (a) every codec-spec header diff an installer can select declares
+#       `spinlock_t unsol_lock;` -- the two repository-root hooks plus the two
+#       patches/*.pre*.diff variants the pre-6.17 installer picks when the
+#       running kernel is older than the implemented version (iscurrent < 0)
 #   (b) every line in new84.h that touches unsol_list or
 #       unsol_items_prealloc_used is lexically inside a spin_lock/spin_unlock
 #       pair (the local-list iteration touches only the private `pending` head)
@@ -28,6 +31,18 @@ cd "$REPO_ROOT" || exit 2
 NEW84="patch_cirrus/patch_cirrus_new84.h"
 DIFF_NEW="patch_cs8409.h.diff"
 DIFF_OLD="patch_patch_cs8409.h.diff"
+# The pre-6.17 installer (install.cirrus.driver.pre617.sh:297-312) selects one
+# of four header hooks: the two root diffs above when the running kernel is at
+# least the implemented version (iscurrent >= 0), and these two variants when
+# it is older.  All four install the same struct cs8409_spec, so all four must
+# declare the lock -- a member that is referenced but never declared does not
+# compile.
+DIFF_UBUNTU_PRE="patches/patch_patch_cs8409.h.ubuntu.pre51547.diff"
+DIFF_MAIN_PRE="patches/patch_patch_cs8409.h.main.pre519.diff"
+
+# Every header hook an installer can select.  Kept as one list so the
+# inventory check below and the (a) assertion cannot drift apart.
+HEADER_DIFFS=("$DIFF_NEW" "$DIFF_OLD" "$DIFF_UBUNTU_PRE" "$DIFF_MAIN_PRE")
 
 fail=0
 ok()  { printf 'ok   - %s\n' "$*"; }
@@ -36,7 +51,7 @@ bad() { printf 'FAIL - %s\n' "$*"; fail=1; }
 # ---------------------------------------------------------------------------
 # prerequisites
 # ---------------------------------------------------------------------------
-for f in "$NEW84" "$DIFF_NEW" "$DIFF_OLD"; do
+for f in "$NEW84" "${HEADER_DIFFS[@]}"; do
   if [ -f "$f" ]; then
     ok "found $f"
   else
@@ -46,9 +61,10 @@ done
 [ "$fail" -eq 0 ] || exit 1
 
 # ---------------------------------------------------------------------------
-# (a) the codec spec declares the lock in both header diffs
+# (a) the codec spec declares the lock in every header hook an installer can
+#     select
 # ---------------------------------------------------------------------------
-for f in "$DIFF_NEW" "$DIFF_OLD"; do
+for f in "${HEADER_DIFFS[@]}"; do
   if grep -qE '^\+[[:space:]]*spinlock_t[[:space:]]+unsol_lock;' "$f"; then
     ok "$f declares spinlock_t unsol_lock"
   else
