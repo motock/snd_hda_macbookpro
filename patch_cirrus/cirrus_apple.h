@@ -459,7 +459,8 @@ struct cs8409_apple_spec {
 	// we use a pre-allocated list - if we have more than 10 outstanding unsols
 	// we will drop
 	//
-	// unsol_lock protects block_unsol, unsol_list and unsol_items_prealloc_used.
+	// unsol_lock protects unsol_list and unsol_items_prealloc_used (the
+	// prealloc slot bookkeeping).
 	// It is a spinlock because the enqueue path (the unsolicited-event work
 	// item) can run in atomic context.  The drain path releases it before it
 	// calls the handlers, because those handlers do codec/I2C I/O and sleep.
@@ -2909,6 +2910,7 @@ static int cs8409_apple(struct hda_codec *codec)
         spec->block_unsol = 0;
 
         INIT_LIST_HEAD(&spec->unsol_list);
+        spin_lock_init(&spec->unsol_lock);
 
         for (itm=0; itm<10; itm++)
                 { spec->unsol_items_prealloc_used[itm] = 0; }
