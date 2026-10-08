@@ -51,6 +51,12 @@ else
     PATCH_CIRRUS=false
 fi
 
+# Persistent staged copy of the tree for dkms (see the install branch).  Sits
+# next to the /usr/src/snd_hda_macbookpro-0.1 symlink dkms.sh creates.
+# SND_HDA_USR_SRC lets the tests redirect /usr/src into a sandbox.
+usr_src=${SND_HDA_USR_SRC:-/usr/src}
+src_link="$usr_src/snd_hda_macbookpro-0.1"
+stage_dir="$usr_src/snd_hda_macbookpro-0.1.src"
 
 if [[ $dkms_action == 'install' ]]; then
 
@@ -64,11 +70,12 @@ if [[ $dkms_action == 'install' ]]; then
     # Editing the tracked $repo/dkms.conf would dirty the checkout (and the old
     # `sed -i.orig` also left an untracked dkms.conf.orig behind), so stage a
     # copy of the tree dkms needs in a temp dir, edit the copy, and point dkms
-    # at the copy.  The temp dir is removed on exit.
+    # at the copy.  dkms keeps building from the /usr/src symlink (AUTOINSTALL),
+    # so the copy must outlive this script: it is removed only if the install
+    # fails or on uninstall, never on a successful exit.
     repo_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
-    stage_dir=$(mktemp -d "${TMPDIR:-/tmp}/snd-hda-dkms.XXXXXX")
-    [[ -d $stage_dir ]] || { echo "cannot create a staging directory" >&2; exit 1; }
-    trap 'rm -rf "$stage_dir"' EXIT
+    rm -rf "$stage_dir"
+    mkdir -p "$stage_dir" || { echo "cannot create a staging directory" >&2; exit 1; }
 
     for _entry in "$repo_dir"/*; do
         [[ -e $_entry ]] || continue
@@ -88,6 +95,9 @@ if [[ $dkms_action == 'install' ]]; then
     ( cd "$stage_dir" && bash dkms.sh ) || rc=$?
     if [[ $rc -ne 0 ]]; then
         echo "dkms install failed (exit $rc)" >&2
+        # leave no half-state behind: the staged copy and the link into it
+        rm -rf "$stage_dir"
+        [[ -L $src_link && ! -e $src_link ]] && rm -f "$src_link"
     fi
 
     # note that Ubuntu, Debian, Fedora and others (see dkms man page) install to updates/dkms
@@ -112,6 +122,11 @@ elif [[ $dkms_action == 'remove' ]]; then
     bash dkms.sh -r || rc=$?
     if [[ $rc -ne 0 ]]; then
         echo "dkms remove failed (exit $rc)" >&2
+    else
+        # dkms.sh -r only removes the link if it resolves; clear the staged
+        # copy first, then any link left dangling by it (or by an older install)
+        rm -rf "$stage_dir"
+        [[ -L $src_link && ! -e $src_link ]] && rm -f "$src_link"
     fi
 
     # none of this is needed now dkms.sh calls dkms remove - including the depmod

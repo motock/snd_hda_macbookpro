@@ -9,8 +9,10 @@
 # `dkms install -c dkms.conf` from its own directory and symlinks that
 # directory into /usr/src, so dkms reads dkms.conf in place.  The installer
 # must instead stage a copy of the tree in a temp dir, write the edited
-# dkms.conf there and point dkms at the copy; the temp dir must be removed on
-# exit (trap ... EXIT), including when the install fails.
+# dkms.conf there and point dkms at the copy.  The copy lives at
+# /usr/src/snd_hda_macbookpro-0.1.src, persists while the module is installed
+# (dkms rebuilds from the /usr/src symlink on kernel updates) and is removed
+# only when the install fails or on uninstall.
 #
 # How the test drives the installers
 # ----------------------------------
@@ -32,20 +34,21 @@
 # -----
 #   1  pre-6.17 installer, 5.19 (run twice): exit 0, checkout byte-identical,
 #      dkms pointed at a staged copy outside the checkout carrying the edited
-#      values, no staging file left behind.
+#      values, and the staged copy still present afterwards.
 #   2  pre-6.17 installer, 5.12: same contract, module snd-hda-codec-cirrus.
 #   3  >= 6.17 installer, 6.17: edits nothing, dkms sees the tracked config
 #      unedited, checkout byte-identical.
 #   4  pre-6.17 installer with `dkms install` failing: the failure is
 #      reported, the checkout is still byte-identical and the staging dir is
-#      still removed (the trap fires on failure too).
+#      removed.
 #   5  pre-6.17 installer, remove branch: the old edits ran before the action
 #      branch, so a remove run dirtied the checkout too; it must leave the
-#      checkout byte-identical.
+#      checkout byte-identical, and remove the staged dir and the link.
 #   6  pre-6.17 installer, 5.19: the /usr/src/snd_hda_macbookpro-0.1 symlink
-#      dkms.sh creates must not be left dangling when the installer's EXIT trap
-#      removes the staged dir it points at, and `dkms.sh -r` must remove it even
-#      when it dangles.
+#      dkms.sh creates must resolve to the persistent staged dir, and
+#      `dkms.sh -r` must remove a leftover dangling link.
+#   7  pre-6.17 installer, remove branch with `dkms.sh -r` failing: the staged
+#      dir is kept.
 #
 # Exit codes: 0 pass, 1 fail, 77 skip.
 
@@ -127,6 +130,10 @@ HDA_FAKE_USR_SRC="$fake_usr_src_root/usr-src"
 mkdir -p "$HDA_FAKE_USR_SRC" || exit 1
 export HDA_FAKE_USR_SRC
 src_link="$HDA_FAKE_USR_SRC/snd_hda_macbookpro-0.1"
+stage_path="$HDA_FAKE_USR_SRC/snd_hda_macbookpro-0.1.src"
+# the pre-6.17 installer stages under $SND_HDA_USR_SRC (default /usr/src)
+SND_HDA_USR_SRC=$HDA_FAKE_USR_SRC
+export SND_HDA_USR_SRC
 
 _real_ln=$(command -v ln) || { echo "no ln on PATH" >&2; exit 1; }
 _real_rm=$(command -v rm) || { echo "no rm on PATH" >&2; exit 1; }
@@ -194,13 +201,10 @@ assert_clean() {
   fi
 }
 
-# assert_no_stale_staging <label> -- the installer's staging directory must be
-# removed when the installer exits (trap ... EXIT), so no generated file is
-# left behind.  The staging dir is created as ${TMPDIR:-/tmp}/snd-hda-dkms.*.
-assert_no_stale_staging() {
-  _label=$1
-  _stale=$(find "${TMPDIR:-/tmp}" -maxdepth 1 -name 'snd-hda-dkms.*' 2>/dev/null | head -1)
-  assert_eq "" "$_stale" "$_label: installer must remove its staging directory on exit"
+# assert_stage_state <label> <present|absent> -- the persistent staged copy.
+assert_stage_state() {
+  if [ -d "$stage_path" ]; then _st=present; else _st=absent; fi
+  assert_eq "$2" "$_st" "$1: staged dir $stage_path must be $2"
 }
 
 # assert_file_absent <path> <msg>
@@ -250,7 +254,7 @@ test_pre617_519_leaves_checkout_clean() {
   assert_eq 0 "$HDA_INSTALLER_RC" \
     "pre617 5.19: installer must exit 0 with all shims succeeding (output: $(hda_installer_output_oneline))"
   assert_clean "pre617 5.19"
-  assert_no_stale_staging "pre617 5.19"
+  assert_stage_state "pre617 5.19" present
 
   # A second run in the same checkout must behave identically: the old
   # `sed -i.orig` left dkms.conf.orig behind, which flipped the script onto its
@@ -260,7 +264,7 @@ test_pre617_519_leaves_checkout_clean() {
   assert_eq 0 "$HDA_INSTALLER_RC" \
     "pre617 5.19 (repeat): installer must exit 0 on a repeat run (output: $(hda_installer_output_oneline))"
   assert_clean "pre617 5.19 (repeat)"
-  assert_no_stale_staging "pre617 5.19 (repeat)"
+  assert_stage_state "pre617 5.19 (repeat)" present
 
   # dkms must have been pointed at a staged COPY carrying the edited values,
   # never at the tracked $repo/dkms.conf; the copy is removed on exit.
@@ -280,8 +284,8 @@ test_pre617_519_leaves_checkout_clean() {
     "dkms must be pointed at a staged copy, not the tracked repo dkms.conf"
   assert_not_contains "$staged_path" "$sandbox" \
     "the staged dkms.conf must live outside the checkout"
-  assert_file_absent "$staged_path" \
-    "the staged dkms.conf must be removed when the installer exits"
+  assert_file_exists "$staged_path" \
+    "the staged dkms.conf must persist after the installer exits"
   case_done "pre617 5.19 (two runs)" "$_failures_before"
 }
 
@@ -300,7 +304,7 @@ test_pre617_512_leaves_checkout_clean() {
   assert_eq 0 "$HDA_INSTALLER_RC" \
     "pre617 5.12: installer must exit 0 (output: $(hda_installer_output_oneline))"
   assert_clean "pre617 5.12"
-  assert_no_stale_staging "pre617 5.12"
+  assert_stage_state "pre617 5.12" present
 
   staged=$(cat "$HDA_DKMS_CONF_CAPTURE" 2>/dev/null || true)
   assert_contains "$staged" 'BUILT_MODULE_NAME[0]="snd-hda-codec-cirrus"' \
@@ -313,8 +317,8 @@ test_pre617_512_leaves_checkout_clean() {
   staged_path=$(cat "$HDA_DKMS_CONF_PATH" 2>/dev/null || true)
   assert_ne "$sandbox/dkms.conf" "$staged_path" \
     "dkms must be pointed at a staged copy, not the tracked repo dkms.conf"
-  assert_file_absent "$staged_path" \
-    "the staged dkms.conf must be removed when the installer exits"
+  assert_file_exists "$staged_path" \
+    "the staged dkms.conf must persist after the installer exits"
   case_done "pre617 5.12" "$_failures_before"
 }
 
@@ -342,7 +346,7 @@ test_617_leaves_checkout_clean() {
 # ---------------------------------------------------------------------------
 # case 4: pre-6.17 installer with `dkms install` failing -- the failure must be
 # reported, the checkout must still be byte-identical, and the staging dir
-# must still be removed (the trap ... EXIT fires on failure too)
+# must be removed so no half-state is left behind
 # ---------------------------------------------------------------------------
 
 test_pre617_failed_install_leaves_checkout_clean() {
@@ -358,52 +362,58 @@ test_pre617_failed_install_leaves_checkout_clean() {
   assert_ne 0 "$HDA_INSTALLER_RC" \
     "pre617 5.19 (failed install): the installer must report the dkms failure"
   assert_clean "pre617 5.19 (failed install)"
-  assert_no_stale_staging "pre617 5.19 (failed install)"
+  assert_stage_state "pre617 5.19 (failed install)" absent
 
   staged_path=$(cat "$HDA_DKMS_CONF_PATH" 2>/dev/null || true)
   assert_ne "$sandbox/dkms.conf" "$staged_path" \
     "failed install: dkms must not be pointed at the tracked repo dkms.conf"
   assert_file_absent "$staged_path" \
-    "failed install: the staged dkms.conf must be removed even when the install fails"
+    "failed install: the staged dkms.conf must be removed when the install fails"
+  assert_ne "valid" "$(link_state "$src_link")" \
+    "failed install: the /usr/src link must not resolve to a staged dir"
   case_done "pre617 5.19 (failed install)" "$_failures_before"
 }
 
 # ---------------------------------------------------------------------------
 # case 5: pre-6.17 installer, remove branch -- the old edits ran before the
 # action branch, so a remove run dirtied the checkout too; it must leave the
-# checkout byte-identical
+# checkout byte-identical and remove the staged dir and the link
 # ---------------------------------------------------------------------------
 
 test_pre617_remove_leaves_checkout_clean() {
   _failures_before=$HDA_ASSERT_FAILURES
   reset_sandbox
+  rm -rf "$stage_path"; rm -f "$src_link"
+
+  hda_installer_run install.cirrus.driver.pre617.sh -i -d -k "$OLD_UNAME"
+  assert_stage_state "pre617 5.19 (remove, after install)" present
 
   hda_installer_run install.cirrus.driver.pre617.sh -r -d -k "$OLD_UNAME"
 
   assert_eq 0 "$HDA_INSTALLER_RC" \
     "pre617 5.19 (remove): installer must exit 0 with all shims succeeding (output: $(hda_installer_output_oneline))"
   assert_clean "pre617 5.19 (remove)"
-  assert_no_stale_staging "pre617 5.19 (remove)"
+  assert_stage_state "pre617 5.19 (remove)" absent
+  assert_eq "absent" "$(link_state "$src_link")" \
+    "pre617 5.19 (remove): the /usr/src link must be gone after uninstall"
   case_done "pre617 5.19 (remove)" "$_failures_before"
 }
 
 # ---------------------------------------------------------------------------
-# case 6: the pre-6.17 installer must not leave a dangling /usr/src symlink
+# case 6: the /usr/src symlink must not dangle after an install
 # ---------------------------------------------------------------------------
 #
-# dkms.sh:48 symlinks the directory it runs from into /usr/src.  The pre-6.17
-# installer runs dkms.sh from its staged temp dir, so the symlink points there;
-# the installer's `trap 'rm -rf "$stage_dir"' EXIT` then deletes that directory
-# and leaves the symlink dangling.  dkms.sh:35's uninstall cleanup
-# (`[[ -e $src_dir ]] && rm -f $src_dir`) tests -e, which is false for a
-# dangling symlink, so the dead link also survives `dkms.sh -r`.  Both are
-# regressions against the old behaviour, where the symlink pointed at the
-# persistent checkout and was removed on uninstall.
+# dkms.sh symlinks the directory it runs from into /usr/src, and dkms keeps
+# building from that link on kernel updates.  The pre-6.17 installer runs
+# dkms.sh from its staged dir, so the staged dir must outlive the installer.
+# Separately, dkms.sh:35 guards the link removal with `-e`, false for a
+# dangling link, so a dangling leftover from an older (buggy) install is
+# cleared by the installer's own uninstall path instead.
 
 test_pre617_leaves_no_dangling_src_symlink() {
   _failures_before=$HDA_ASSERT_FAILURES
   reset_sandbox
-  rm -f "$src_link"
+  rm -rf "$stage_path"; rm -f "$src_link"
 
   hda_installer_run install.cirrus.driver.pre617.sh -i -d -k "$OLD_UNAME"
 
@@ -417,19 +427,50 @@ test_pre617_leaves_no_dangling_src_symlink() {
   assert_contains "$(hda_shim_calls ln)" "ln " \
     "pre617 5.19 (src symlink): dkms.sh must have created the /usr/src symlink"
 
-  # The regression: after the installer exits, the symlink must not dangle.
   assert_ne "dangling" "$(link_state "$src_link")" \
-    "pre617 5.19 (src symlink): the installer must not leave a dangling $src_link (its EXIT trap deletes the staged dir the symlink points at)"
+    "pre617 5.19 (src symlink): the installer must not leave a dangling $src_link"
+  assert_eq "valid" "$(link_state "$src_link")" \
+    "pre617 5.19 (src symlink): the link must resolve to the staged dir"
+  assert_file_exists "$src_link/dkms.conf" \
+    "pre617 5.19 (src symlink): the link must reach the staged dkms.conf"
+  assert_contains "$(cat "$src_link/dkms.conf" 2>/dev/null || true)" 'BUILT_MODULE_LOCATION[0]="build/hda"' \
+    "pre617 5.19 (src symlink): the linked dkms.conf must carry the edits"
 
-  # And `dkms.sh -r` must remove it, dangling or not.
-  hda_installer_run dkms.sh -r
+  # A dangling link left by an older install must be gone after uninstall.
+  rm -rf "$stage_path"
+  assert_eq "dangling" "$(link_state "$src_link")" \
+    "pre617 5.19 (src symlink): fixture must start with a dangling link"
+
+  hda_installer_run install.cirrus.driver.pre617.sh -r -d -k "$OLD_UNAME"
 
   assert_eq 0 "$HDA_INSTALLER_RC" \
-    "pre617 5.19 (src symlink): dkms.sh -r must exit 0 (output: $(hda_installer_output_oneline))"
+    "pre617 5.19 (src symlink): uninstall must exit 0 (output: $(hda_installer_output_oneline))"
   assert_eq "absent" "$(link_state "$src_link")" \
-    "pre617 5.19 (src symlink): dkms.sh -r must remove the /usr/src symlink even when it dangles (dkms.sh:35 tests -e, false for a dangling symlink)"
+    "pre617 5.19 (src symlink): uninstall must remove a dangling /usr/src symlink"
 
   case_done "pre617 5.19 (src symlink)" "$_failures_before"
+}
+
+# ---------------------------------------------------------------------------
+# case 7: dkms.sh -r failing keeps the staged dir (dkms may still need it)
+# ---------------------------------------------------------------------------
+
+test_pre617_failed_remove_keeps_stage() {
+  _failures_before=$HDA_ASSERT_FAILURES
+  reset_sandbox
+  rm -rf "$stage_path"; rm -f "$src_link"
+
+  hda_installer_run install.cirrus.driver.pre617.sh -i -d -k "$OLD_UNAME"
+  assert_stage_state "pre617 5.19 (failed remove, after install)" present
+
+  hda_shim_rc dkms 1
+  hda_installer_run install.cirrus.driver.pre617.sh -r -d -k "$OLD_UNAME"
+  hda_shim_rc_clear dkms
+
+  assert_ne 0 "$HDA_INSTALLER_RC" \
+    "pre617 5.19 (failed remove): the installer must report the dkms remove failure"
+  assert_stage_state "pre617 5.19 (failed remove)" present
+  case_done "pre617 5.19 (failed remove)" "$_failures_before"
 }
 
 # ---------------------------------------------------------------------------
@@ -442,5 +483,6 @@ test_617_leaves_checkout_clean
 test_pre617_failed_install_leaves_checkout_clean
 test_pre617_remove_leaves_checkout_clean
 test_pre617_leaves_no_dangling_src_symlink
+test_pre617_failed_remove_keeps_stage
 
 finish
