@@ -140,6 +140,62 @@ NOTA BENE - do NOT use -D hw:0,0 with StereoTest32.wav
 
 waveform provided by milan475
 
+### Codec re-probe (WARN_ON in `hda_codec_driver_probe`)
+
+`tests/test_driver_apple_ops_probe.sh` is a *static* check: it proves
+`cs_8409_apple_ops` carries a `.probe` member, but it cannot prove the kernel
+stops warning. That needs a real re-probe on hardware, because the bug only
+shows up on the **second** probe of the codec.
+
+Background: `cs8409_apple()` overwrites `driver->ops` with
+`cs_8409_apple_ops`. On >= 6.17 `hda_codec_driver_probe()`
+(`sound/hda/common/bind.c`) does
+
+```c
+if (WARN_ON(!(driver->ops && driver->ops->probe))) {
+        err = -EINVAL;
+        goto error_module_put;
+}
+err = driver->ops->probe(codec, codec->preset);
+```
+
+so a table without `.probe` makes the next probe of that codec fail with
+`-EINVAL` and a `WARN_ON` splat. The first probe is fine -- the real probe has
+already run by the time `cs8409_apple()` swaps the table -- which is why this
+is invisible at boot and only bites on unbind/bind or a module reload.
+
+Recipe (root, on a machine with the patched module installed):
+
+```sh
+# 1. find the codec address (the CS8409/CS42L83 one, e.g. 0-0 or 0-2)
+grep -i cs8409 /proc/asound/cards
+cat /sys/class/sound/hwC0D0/vendor_name 2>/dev/null
+
+# 2. clear dmesg so the check below is unambiguous
+dmesg -C
+
+# 3. force a fresh probe of that codec
+echo 0-0 > /sys/bus/hdaudio/devices/hdaudioC0D0/driver/unbind
+echo 0-0 > /sys/bus/hdaudio/devices/hdaudioC0D0/driver/bind
+
+# 4. inspect the result
+dmesg | grep -iE 'WARN|cs8409|hda_codec_driver_probe'
+```
+
+Pass criteria:
+
+* no `WARNING:` / `WARN_ON` trace mentioning `hda_codec_driver_probe`;
+* no `-EINVAL` / probe failure for the codec;
+* the codec comes back -- `aplay -l` still lists the card and the
+  `vendor_name` file still reads back.
+
+Before the fix, step 3 produced the `WARN_ON` splat and the codec failed to
+re-probe. If the codec does not come back, reload the module to recover:
+
+```sh
+modprobe -r snd_hda_codec_cs8409 && modprobe snd_hda_codec_cs8409
+```
+
 ## Kernel source cache
 
 Some tests need a real kernel source tree to patch or inspect. Downloading and
