@@ -269,3 +269,90 @@ can never hold. The SPDX lines themselves are present and correct. See the
 comment in `tests/xfail.list` for the full diagnosis; fixing B6 belongs to
 HDA-41. Listing it here keeps `make test` honest: the failure is named and
 counted as XFAIL rather than being hidden or silently ignored.
+
+## Static checks for the install shell scripts: `tests/test_shell_static.sh`
+
+HDA-04. The three shell entry points shipped to users --
+`install.cirrus.driver.sh`, `install.cirrus.driver.pre617.sh` and `dkms.sh` --
+are checked statically, so a broken script is caught before anyone runs it as
+root.
+
+### What it checks
+
+| Check | Fails when |
+| ----- | ---------- |
+| `bash -n` | a script does not parse. Hard failure, always runs. |
+| shellcheck baseline | shellcheck reports a finding that is not listed in `tests/shellcheck-baseline.txt`. |
+| stale baseline entry | an entry in the baseline no longer fires. |
+
+The baseline comparison is **count-insensitive**: a code that fires N times in
+one file is listed once, and line numbers are not part of the key, so unrelated
+edits do not churn the file. Findings are collected with
+
+```sh
+shellcheck -f gcc -S warning <script>...
+```
+
+and reduced to `file:CODE` pairs.
+
+### `tests/shellcheck-baseline.txt`
+
+One `file:CODE` per line, e.g. `dkms.sh:SC2034`. Blank lines and `#` comments
+are ignored. The header comment records the shellcheck version the baseline was
+built with (0.10.0).
+
+**The baseline may only shrink.** A finding that is not listed fails the test
+and is printed as `new shellcheck finding: <file>:<CODE>`; an entry that no
+longer fires fails the test and is printed as `stale baseline entry:
+<file>:<CODE>`. So the hygiene story that fixes a finding must delete its line
+here -- leaving the line behind is a failure, not a no-op. That is the same
+rule `tests/xfail.list` uses for `XPASS`, and for the same reason: it stops the
+file from rotting into a list of things that are no longer true.
+
+To regenerate after fixing findings, run the command above and keep only the
+lines you have not yet fixed.
+
+### shellcheck is optional
+
+`bash -n` needs nothing but bash, so it always runs. If `shellcheck` is not on
+`PATH`, the baseline comparison is skipped with a note and the test still
+passes:
+
+```
+SKIP: shellcheck is not on PATH -- the baseline comparison (R3/R4) was not run;
+the bash -n checks above did run
+```
+
+To run the full check locally, put shellcheck on `PATH` first:
+
+```sh
+PATH="/path/to/shellcheck:$PATH" bash tests/test_shell_static.sh
+```
+
+The test prints the shellcheck version it used and the version recorded in the
+baseline, and notes it when they differ -- a version difference can change
+findings, so a failure on a machine with a different shellcheck is worth
+reading before it is blamed on the scripts.
+
+### Negative cases
+
+The checks are proved non-vacuous by fixtures that must fail, all in a scratch
+directory (the repository is never modified):
+
+* a copy of `dkms.sh` with an unterminated `if` appended must be rejected by
+  `bash -n`, and the rejection must name the syntax error;
+* a scratch script with an unquoted command substitution must be reported as a
+  `new shellcheck finding` (SC2046 -- note that SC2086, the unquoted-variable
+  case, is an *info* finding and is filtered out by `-S warning`, so the
+  fixture uses the warning-severity form);
+* a scratch baseline containing an entry that cannot fire must be reported as a
+  `stale baseline entry`, while the entries that do fire are not.
+
+### Running it
+
+```sh
+bash tests/test_shell_static.sh   # 0 pass, 1 fail, 77 skip
+```
+
+It never exits 77: the shellcheck part degrades to a note instead of skipping
+the whole file, so `bash -n` coverage is never lost.

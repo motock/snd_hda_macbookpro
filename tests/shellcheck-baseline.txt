@@ -1,0 +1,34 @@
+# tests/shellcheck-baseline.txt -- accepted shellcheck findings for the
+# install shell scripts.
+#
+# Format: one `file:CODE` per line, e.g. `dkms.sh:SC2034`.  Line numbers are
+# deliberately omitted so the baseline does not churn when unrelated lines
+# move, and the comparison in tests/test_shell_static.sh is count-insensitive:
+# a code that fires N times in a file is listed once.
+#
+# Generated with:
+#     shellcheck -f gcc -S warning install.cirrus.driver.sh \
+#         install.cirrus.driver.pre617.sh dkms.sh
+# ShellCheck version used to build this baseline: 0.10.0
+#
+# The baseline may only shrink.  tests/test_shell_static.sh fails on
+#   * a finding that is NOT listed here (printed as "new shellcheck
+#     finding: <file>:<CODE>"), and
+#   * an entry here that no longer fires (printed as "stale baseline
+#     entry: <file>:<CODE>").
+# So the hygiene story that fixes a finding must delete its line here; an
+# entry left behind after the fix is a failure, not a no-op.
+#
+# Scripts covered: install.cirrus.driver.sh, install.cirrus.driver.pre617.sh,
+# dkms.sh.
+
+dkms.sh:SC2034
+dkms.sh:SC2164
+dkms.sh:SC2220
+install.cirrus.driver.pre617.sh:SC2034
+install.cirrus.driver.pre617.sh:SC2046
+install.cirrus.driver.pre617.sh:SC2166
+install.cirrus.driver.sh:SC2034
+install.cirrus.driver.sh:SC2046
+install.cirrus.driver.sh:SC2124
+install.cirrus.driver.sh:SC2166
