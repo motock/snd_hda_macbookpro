@@ -1,4 +1,6 @@
 
+Which installer to run and which kernels are supported (6.17 and later vs below 6.17) is documented in README.md.
+
 NOTE that the headphone plugin/unplug events use unsolicited responses which under linux seem to be executed concurrently
 with other commands.
 I have implemented a blocking system to ensure the response verb blocks are done serially (which seems to be how OSX does this).
@@ -36,7 +38,8 @@ which ends up as 44.1 kHz, 24 bit 4 channel audio which is output by the 8409 wi
 
 Issues:
 
-Because the format is fixed at 44.1 kHz, 24 bit (S24_3LE) 4 channel and the format is set by undocumented vendor node
+Because Apple's format is fixed at 44.1 kHz, 24 bit (S24_3LE) 4 channel and the format is set by undocumented vendor node
 commands its not clear if other formats can be supported in the 8409 itself.
-It appears now that Apples set up can take eg S24_LE format and S32_LE format.
+It appears now that Apples set up can take eg S24_LE format and S32_LE format, and these are the formats the driver
+exposes (see README.md).
 
