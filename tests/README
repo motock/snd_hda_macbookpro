@@ -385,6 +385,83 @@ comment in `tests/xfail.list` for the full diagnosis; fixing B6 belongs to
 HDA-41. Listing it here keeps `make test` honest: the failure is named and
 counted as XFAIL rather than being hidden or silently ignored.
 
+## Unsolicited-event queue lock: `tests/test_driver_unsol_lock.sh`
+
+HDA-20. The unsolicited-response queue in
+`patch_cirrus/patch_cirrus_new84.h` (`spec->unsol_list` plus the
+`spec->unsol_items_prealloc_used[]` slot bookkeeping) is shared between the
+enqueue path (the unsolicited-event work item) and the drain paths, so it is
+guarded by `spec->unsol_lock`, a spinlock declared in the codec spec by
+`patch_cs8409.h.diff` and `patch_patch_cs8409.h.diff`.
+
+### What it checks
+
+| Check | Fails when |
+| ----- | ---------- |
+| (a) spec declares the lock | either header diff lacks `spinlock_t unsol_lock;` |
+| (b) queue accesses are locked | a line touching `unsol_list` or `unsol_items_prealloc_used` sits outside a `spin_lock_irqsave`/`spin_unlock_irqrestore` pair |
+| (b) lock pairs balance | the lock depth goes negative or is non-zero at end of file |
+| (c) no sleeping work under the lock | a `memset()` or a call to `cs_8409_cs42l83_unsolicited_response_finalize()` appears between a lock and its unlock |
+| (d) hooks still apply | the root `*.diff` hooks stop applying to the pinned trees |
+
+The (b)/(c) scans are awk passes over the file that skip comment lines and
+report the offending line numbers, so a failure names the exact line to fix.
+
+### Honest scope: this proves structure, not the absence of races
+
+This is a **static** regression guard. It proves the locking *structure* is
+present and balanced -- every queue access is inside a critical section, and no
+sleeping call is. It cannot prove the critical sections are the *right* ones,
+that a path is not missed, or that the lock is acquired in a safe order
+relative to the other locks in the codec. Kernel code cannot be unit-run here,
+so the absence of a data race is only ever demonstrated on hardware, with a
+kernel built with lockdep and KCSAN enabled.
+
+### Known limitation
+
+`block_unsol` is read and written outside `unsol_lock`, so an event enqueued
+while a drain is finishing can be left queued until the next unsolicited
+event. That is a delayed event, not memory corruption, and this behaviour
+predates the lock.
+
+### Manual validation recipe (needs the hardware)
+
+Run this on a MacBook with the CS8409/CS42L83 codec, on a kernel built with
+`CONFIG_PROVE_LOCKING=y` (lockdep) and `CONFIG_KCSAN=y`:
+
+```sh
+# 1. build and install the driver against a lockdep+KCSAN kernel
+./install.cirrus.driver.sh
+
+# 2. start playback and leave it running
+aplay -D plughw:CARD=CS8409,DEV=0 tests/StereoTest32.wav &
+
+# 3. hot-plug the jack repeatedly while playback runs, so unsolicited
+#    responses are enqueued from the work item while the PCM hooks drain
+for i in $(seq 1 20); do
+    # plug in
+    echo "cycle $i: plug"
+    sleep 2
+    # unplug
+    echo "cycle $i: unplug"
+    sleep 2
+done
+
+# 4. check for lockdep splats, KCSAN reports and list corruption
+dmesg | grep -iE 'BUG:|WARNING:|possible deadlock|data-race|unsol'
+```
+
+A clean run has no `BUG:`, no `WARNING:`, no `possible deadlock`, no
+`data-race` and no `list_del` corruption. Any of those means the lock is
+wrong, and the static guard above did not catch it -- which is exactly the
+limit the guard documents.
+
+### Running it
+
+```sh
+bash tests/test_driver_unsol_lock.sh   # 0 pass, 1 fail, 77 skip
+```
+
 ## Static checks for the install shell scripts: `tests/test_shell_static.sh`
 
 HDA-04. The three shell entry points shipped to users --
