@@ -35,34 +35,3 @@
 # Fixing the hooks is a separate story.  Until then this test fails on purpose
 # so the drift stays visible instead of being papered over.
 test_hooks_apply.sh
-
-# ---------------------------------------------------------------------------
-# test_installer_exit_status.sh -- HDA-05.  The installers report success after
-# a failed install: dkms.sh ends with `popd > /dev/null` (line 44), and both
-# installers end their dkms branches with `ls -lA $update_dir` followed by a
-# bare `exit` (install.cirrus.driver.sh:73-74, pre617:77-78).  The download
-# path has the same shape: `[[ $? -ne 0 ]] && echo ... && exit`
-# (install.cirrus.driver.sh:203, pre617:219) exits 0 because the echo succeeds.
-#
-# Which cases really fail today (measured on macOS, non-root):
-#   FAIL  dkms.sh, `dkms install` failed                       -> exits 0
-#   FAIL  install.cirrus.driver.sh -i, `dkms install` failed   -> exits 0
-#   FAIL  install.cirrus.driver.pre617.sh -i, `dkms install` failed -> exits 0
-#   FAIL  install.cirrus.driver.sh -r, `dkms remove` failed    -> exits 0
-#   FAIL  install.cirrus.driver.pre617.sh -r, `dkms remove` failed  -> exits 0
-#
-# The remaining cases -- the non-dkms path of both installers, with `make
-# install`, `wget` or `tar` failing -- cannot be driven on this machine at all
-# and print BLOCKED instead of passing or failing.  The installer's
-# kernel-headers probe (`[ -d /usr/src/linux-headers-<ver> ]`,
-# install.cirrus.driver.sh:97-128, pre617:114-145) is a bash builtin on an
-# absolute path, so no PATH shim can influence it, and /usr/src is not
-# writable here; the probe exits 1 before the code under test.  They are
-# written out and will run on a Linux box with kernel headers installed.  No
-# test seam was added to production for this story.
-#
-# The positive controls live in tests/test_installer_exit_status_controls.sh,
-# which is NOT listed here and must stay green.
-#
-# remove when B1 (HDA-10) lands
-test_installer_exit_status.sh

@@ -66,7 +66,11 @@ if [[ $dkms_action == 'install' ]]; then
 dec-cs8409.ko"
 
     # run dkms install script
-    bash dkms.sh
+    rc=0
+    bash dkms.sh || rc=$?
+    if [[ $rc -ne 0 ]]; then
+        echo "dkms install failed (exit $rc)" >&2
+    fi
 
     # note that Ubuntu, Debian, Fedora and others (see dkms man page) install to updates/dkms
     # and ignore DEST_MODULE_LOCATION
@@ -74,8 +78,8 @@ dec-cs8409.ko"
     # (although the original module should be copied to under /var/lib/dkms if needed for other distributions)
     update_dir="/lib/modules/${UNAME}/updates"
     echo -e "\ncontents of $update_dir"
-    ls -lA $update_dir
-    exit
+    ls -lA $update_dir || true
+    exit "$rc"
 
 elif [[ $dkms_action == 'remove' ]]; then
 
@@ -86,15 +90,19 @@ elif [[ $dkms_action == 'remove' ]]; then
 
     # we MUST call dkms remove to ensure any archived base kernel module is restored
     # and it also removes the whole dkms module subtree
-    bash dkms.sh -r 
- 
+    rc=0
+    bash dkms.sh -r || rc=$?
+    if [[ $rc -ne 0 ]]; then
+        echo "dkms remove failed (exit $rc)" >&2
+    fi
+
     # none of this is needed now dkms.sh calls dkms remove - including the depmod
     # next line needed to properly clean up dkms module
     # but not needed now we call dkms remove in dkms.sh
     # (it may be immaterial as the original module wont be loaded in any case as the hardware wont match on Apple machine)
     #update_dir="/lib/modules/${UNAME}/updates"
     #[[ -e $update_dir/dkms/snd-hda-codec-cs8409.ko.zst ]] && rm $update_dir/dkms/snd-hda-codec-cs8409.ko.zst && depmod -a && echo "removed $update_dir/dkms/snd-hda-codec-cs8409.ko.zst"
-    exit
+    exit "$rc"
 
 fi
 
@@ -216,7 +224,7 @@ else
    		kernel_version=$major_version.$minor_version
    		wget -c https://cdn.kernel.org/pub/linux/kernel/v$major_version.x/linux-$kernel_version.tar.xz -P $build_dir
 
-		[[ $? -ne 0 ]] && echo "kernel could not be downloaded...exiting" && exit
+		[[ $? -ne 0 ]] && echo "kernel could not be downloaded...exiting" >&2 && exit 1
 	fi
 
 	set -e
@@ -313,15 +321,20 @@ if [[ ! $dkms = true ]]; then
 
 	echo "DKMS FALSE DONE"
 
+	rc=0
 	if [ $PATCH_CIRRUS = true ]; then
-		make PATCH_CIRRUS=1
-		make install PATCH_CIRRUS=1
+		make PATCH_CIRRUS=1 || rc=$?
+		make install PATCH_CIRRUS=1 || rc=$?
 
 	else
-		make KERNELRELEASE=$UNAME
-		make install KERNELRELEASE=$UNAME
+		make KERNELRELEASE=$UNAME || rc=$?
+		make install KERNELRELEASE=$UNAME || rc=$?
 
 	fi
+	if [[ $rc -ne 0 ]]; then
+		echo "make failed (exit $rc)" >&2
+	fi
 	echo -e "\ncontents of $update_dir"
-	ls -lA $update_dir
+	ls -lA $update_dir || true
+	exit "$rc"
 fi
