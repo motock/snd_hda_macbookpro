@@ -79,6 +79,18 @@ dnf install gcc kernel-devel make patch wget
 ```
 apt install gcc linux-headers-generic make patch wget
 ```
+On Ubuntu and Ubuntu-based distributions (Linux Mint, Pop!_OS) the installers look for the
+distribution kernel source package, `/usr/src/linux-source-<version>.tar.bz2`, where `<version>` is
+the kernel's `x.y.z` (for example `6.8.0`), so also run `sudo apt install linux-source-<version>`.
+What happens without it depends on the installer:
+
+* `install.cirrus.driver.sh` (kernel 6.17 and later) falls back to downloading the verified mainline
+  `x.y` tarball from cdn.kernel.org. The package is optional but preferred, since it carries
+  Ubuntu's backports (see the kernel 7.0 section below).
+* `install.cirrus.driver.pre617.sh` (kernels below 6.17) does not download on Ubuntu; it stops and
+  tells you to install `linux-source-<version>`. The package is required.
+
+Fedora, Arch and Void have no such package; the installers always download the mainline tarball.
 **arch package install**
 ```
 pacman -S gcc linux-headers make patch wget
@@ -130,10 +142,14 @@ neither variable set it keeps the historical bare `depmod -a` (current kernel).
 ```
 # Check your kernel version
 uname -a
-# delete the ko file
+# delete the ko file; the module may be compressed (.ko.zst, .ko.xz or .ko.gz)
+# installed with install.cirrus.driver.sh (kernel 6.17 and later):
+sudo rm /lib/modules/{kernel version}/updates/codecs/cirrus/snd-hda-codec-cs8409.ko
+# installed with install.cirrus.driver.pre617.sh (kernels below 6.17):
 sudo rm /lib/modules/{kernel version}/updates/snd-hda-codec-cs8409.ko
-sudo depmod -a
+sudo depmod -a {kernel version}
 ```
+If you installed through dkms, do not delete the file by hand; see "remove driver from dkms" below.
 
 Linux Mint and Ubuntu on kernel 7.0:
 -------------
@@ -188,4 +204,7 @@ sudo ./install.cirrus.driver.sh -i
 ```
 sudo ./install.cirrus.driver.sh -r
 ```
+This runs `dkms remove snd_hda_macbookpro/0.1` (the name and version from `dkms.conf`), which also
+restores any base kernel module dkms archived. The dkms module lives in
+`/lib/modules/{kernel version}/updates/dkms/`. Afterwards run `sudo depmod -a`.
 
