@@ -56,6 +56,9 @@ NOTA BENE. As of linux kernel 6.17 the sound kernel source directory has been co
            the old installation script as needed.
            For older kernel version you can just run the old installation script directly
            ie install.cirrus.driver.pre617.sh.
+           Use install.cirrus.driver.sh for kernels 6.17 and later (including 7.x) and
+           install.cirrus.driver.pre617.sh for kernels below 6.17. The old script refuses a
+           kernel 6.17 or later and tells you to use install.cirrus.driver.sh; both honour -k.
            Note that for kernel version 6.17 new files and directories have been added to the repo
            rather than attempting to update the pre 6.17 versions (as the kernel source changes also
            involved name changes and the new files are more consistent with the new kernel names).

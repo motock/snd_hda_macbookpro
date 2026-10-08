@@ -42,6 +42,18 @@ revpart1=$(echo $revision | cut -d '-' -f1)
 revpart2=$(echo $revision | cut -d '-' -f2)
 revpart3=$(echo $revision | cut -d '-' -f3)
 
+. "$repo_dir/lib/kernel_version.sh"
+
+if ! is_kernel_release "$UNAME"; then
+	echo "error: invalid kernel release '$UNAME' (expected MAJOR.MINOR[.PATCH], eg 6.8.0)" >&2
+	exit 1
+fi
+
+if ! version_lt "$kernel_version" 6.17; then
+	echo "error: kernel $UNAME is 6.17 or later - use install.cirrus.driver.sh for kernels >= 6.17" >&2
+	exit 1
+fi
+
 
 # The dkms.conf edits that used to be applied here are now applied to a staged
 # copy of the tree (see the dkms install branch below), never to the tracked
@@ -290,38 +302,22 @@ fi
 mv $hda_dir/Makefile $hda_dir/Makefile.orig
 cp $patch_dir/Makefile $patch_dir/patch_cirrus_* $hda_dir
 pushd $hda_dir > /dev/null
-# define the ubuntu/mainline versions that work at the moment
+# 1 is the implemented version (or newer than the oldest Ubuntu revision that
+# works), 2 is later than the newest, -1 is older than the oldest
 # for ubuntu allow a range of revisions that work
-current_major=5
-current_minor=19
-current_minor_ubuntu=15
-current_rev_ubuntu=47
-latest_rev_ubuntu=71
-
-iscurrent=0
+iscurrent=-1
 if [ $isubuntu -ge 1 ]; then
-	if [ $major_version -gt $current_major ]; then
+	ubuntu_version=$major_version.$minor_version.$revpart2
+	if version_lt 5.15.71 "$ubuntu_version"; then
 		iscurrent=2
-	elif [ $major_version -eq $current_major -a $minor_version -gt $current_minor_ubuntu ]; then
-		iscurrent=2
-	elif [ $major_version -eq $current_major -a $minor_version -eq $current_minor_ubuntu -a $revpart2 -gt $latest_rev_ubuntu ]; then
-		iscurrent=2
-	elif [ $major_version -eq $current_major -a $minor_version -eq $current_minor_ubuntu -a $revpart2 -gt $current_rev_ubuntu ]; then
+	elif ! version_lt "$ubuntu_version" 5.15.47; then
 		iscurrent=1
-	elif [ $major_version -eq $current_major -a $minor_version -eq $current_minor_ubuntu -a $revpart2 -eq $current_rev_ubuntu ]; then
-		iscurrent=1
-	else
-		iscurrent=-1
 	fi
 else
-	if [ $major_version -gt $current_major ]; then
+	if version_lt 5.19 "$major_version.$minor_version"; then
 		iscurrent=2
-	elif [ $major_version -eq $current_major -a $minor_version -gt $current_minor ]; then
-		iscurrent=2
-	elif [ $major_version -eq $current_major -a $minor_version -eq $current_minor ]; then
+	elif ! version_lt "$major_version.$minor_version" 5.19; then
 		iscurrent=1
-	else
-		iscurrent=-1
 	fi
 fi
 
