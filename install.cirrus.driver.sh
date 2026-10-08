@@ -43,7 +43,15 @@ revpart1=$(echo $revision | cut -d '-' -f1)
 revpart2=$(echo $revision | cut -d '-' -f2)
 revpart3=$(echo $revision | cut -d '-' -f3)
 
-. "$repo_dir/lib/kernel_version.sh"
+# Numeric per-component comparison: 6.9 < 6.17 and 6.100 > 6.17 (a string
+# comparison gets both wrong).
+version_lt() {
+	[ "$1" != "$2" ] && [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | head -n1)" = "$1" ]
+}
+
+is_kernel_release() {
+	[[ $1 =~ ^[0-9]+\.[0-9]+ ]]
+}
 
 if ! is_kernel_release "$UNAME"; then
 	echo "error: invalid kernel release '$UNAME' (expected MAJOR.MINOR[.PATCH], eg 6.17.0)" >&2

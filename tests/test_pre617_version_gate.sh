@@ -9,7 +9,7 @@
 #                                    older to install.cirrus.driver.pre617.sh
 #
 # Both gate on the requested release (-k, else the positional argument, else
-# `uname -r`) with version_lt (lib/kernel_version.sh).  The uname shim
+# `uname -r`) with version_lt (defined in each installer).  The uname shim
 # (HDA_SHIM_UNAME_R) supplies the release; one row also uses -k.
 #
 # An accepted row is one that gets past the gate: the output carries neither
