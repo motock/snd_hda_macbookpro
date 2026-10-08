@@ -458,11 +458,16 @@ struct cs8409_apple_spec {
 	// responses
 	// we use a pre-allocated list - if we have more than 10 outstanding unsols
 	// we will drop
-	// not clear if mutexes would be the way to go
+	//
+	// unsol_lock protects block_unsol, unsol_list and unsol_items_prealloc_used.
+	// It is a spinlock because the enqueue path (the unsolicited-event work
+	// item) can run in atomic context.  The drain path releases it before it
+	// calls the handlers, because those handlers do codec/I2C I/O and sleep.
 	int block_unsol;
 	struct list_head unsol_list;
 	struct unsol_item unsol_items_prealloc[10];
 	int unsol_items_prealloc_used[10];
+	spinlock_t unsol_lock;
 
 	// add in specific nids for the intmike and linein as they seem to swap
 	// between macbook pros (14,3) and imacs (18,3)
