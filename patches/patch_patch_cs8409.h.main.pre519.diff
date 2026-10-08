@@ -430,7 +430,7 @@ index d0b725c..d8b5232 100644
  	unsigned int force_status_change:1;
  	unsigned int suspended:1;
  	unsigned int paged:1;
-@@ -337,6 +363,133 @@ struct cs8409_spec {
+@@ -337,6 +363,126 @@ struct cs8409_spec {
  	unsigned int init_done:1;
  	unsigned int build_ctrl_done:1;
  
@@ -459,18 +459,11 @@ index d0b725c..d8b5232 100644
 +	// responses
 +	// we use a pre-allocated list - if we have more than 10 outstanding unsols
 +	// we will drop
-+	// unsol_lock protects unsol_list and the unsol_items_prealloc_used[]
-+	// slot bookkeeping.  The enqueue path (the unsolicited-event work item,
-+	// which runs in workqueue/process context) and the drain/PCM paths can
-+	// race, so every queue mutation is taken under this spinlock.  It is
-+	// held only for the slot claim, list_add_tail, list_splice_init and the
-+	// slot release, and is ALWAYS dropped before the response handlers run
-+	// because those handlers do codec/I2C I/O that sleeps.
++	// not clear if mutexes would be the way to go
 +	int block_unsol;
 +	struct list_head unsol_list;
 +	struct unsol_item unsol_items_prealloc[10];
 +	int unsol_items_prealloc_used[10];
-+	spinlock_t unsol_lock;
 +
 +	// add in specific nids for the intmike and linein as they seem to swap
 +	// between macbook pros (14,3) and imacs (18,3)
