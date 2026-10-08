@@ -102,7 +102,11 @@ scan_fn() {
       }
       after[NR] = depth
       if (is_free(code[NR])) free[NR] = 1
-      if (code[NR] ~ /return[[:space:]]+-[A-Za-z0-9_]+[[:space:]]*;/) negret[NR] = 1
+      # A negative-valued return: either a negative constant or `return err;`
+      # (err is only ever assigned a negative value on the paths that reach a
+      # return).  `return 0;` is deliberately excluded -- see succret below.
+      if (code[NR] ~ /return[[:space:]]+-[A-Za-z0-9_]+[[:space:]]*;/ ||
+          code[NR] ~ /return[[:space:]]+err[[:space:]]*;/) negret[NR] = 1
       if (code[NR] ~ /return[[:space:]]+0[[:space:]]*;/) succret[NR] = 1
       if (index(code[NR], alloc)) allocline = NR
       if (code[NR] ~ ("^[[:space:]]*" label ":")) labelline = NR
