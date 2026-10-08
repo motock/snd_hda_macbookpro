@@ -7,9 +7,10 @@
 # `sed -i` (and, on the first run, `sed -i.orig`, which additionally left an
 # untracked dkms.conf.orig behind).  Nothing required that: dkms.sh runs
 # `dkms install -c dkms.conf` from its own directory and symlinks that
-# directory into /usr/src, so dkms reads dkms.conf in place.  The installer now
-# stages a copy of the tree in a temp dir, writes the edited dkms.conf there
-# and points dkms at the copy; the temp dir is removed on exit.
+# directory into /usr/src, so dkms reads dkms.conf in place.  The installer
+# must instead stage a copy of the tree in a temp dir, write the edited
+# dkms.conf there and point dkms at the copy; the temp dir must be removed on
+# exit (trap ... EXIT), including when the install fails.
 #
 # How the test drives the installers
 # ----------------------------------
@@ -26,6 +27,21 @@
 #
 # The dkms shim records the argv, the path of the config it was pointed at and
 # a copy of that config, so the test can assert dkms saw the edited values.
+#
+# Cases
+# -----
+#   1  pre-6.17 installer, 5.19 (run twice): exit 0, checkout byte-identical,
+#      dkms pointed at a staged copy outside the checkout carrying the edited
+#      values, no staging file left behind.
+#   2  pre-6.17 installer, 5.12: same contract, module snd-hda-codec-cirrus.
+#   3  >= 6.17 installer, 6.17: edits nothing, dkms sees the tracked config
+#      unedited, checkout byte-identical.
+#   4  pre-6.17 installer with `dkms install` failing: the failure is
+#      reported, the checkout is still byte-identical and the staging dir is
+#      still removed (the trap fires on failure too).
+#   5  pre-6.17 installer, remove branch: the old edits ran before the action
+#      branch, so a remove run dirtied the checkout too; it must leave the
+#      checkout byte-identical.
 #
 # Exit codes: 0 pass, 1 fail, 77 skip.
 
@@ -74,6 +90,8 @@ FAKE
 chmod +x "$HDA_SHIMS/sed" || exit 1
 
 # --- dkms shim: record the config dkms was pointed at ----------------------
+# Honours HDA_SHIM_RC_dkms (falling back to HDA_SHIM_RC, default 0) so a case
+# can make `dkms install` fail.
 cat > "$HDA_SHIMS/dkms" <<'FAKE'
 #!/bin/bash
 printf 'dkms %s\n' "$*" >> "$HDA_SHIM_LOG"
@@ -87,7 +105,8 @@ if [ -n "$_cfg" ] && [ -f "$_cfg" ]; then
   cp "$_cfg" "$HDA_DKMS_CONF_CAPTURE"
   printf '%s\n' "$(cd "$(dirname "$_cfg")" && pwd)/$(basename "$_cfg")" > "$HDA_DKMS_CONF_PATH"
 fi
-exit 0
+_rc=${HDA_SHIM_RC_dkms:-${HDA_SHIM_RC:-0}}
+exit "$_rc"
 FAKE
 chmod +x "$HDA_SHIMS/dkms" || exit 1
 
@@ -113,12 +132,39 @@ reset_sandbox() {
 }
 
 # assert_clean <label> -- the checkout must be byte-identical to the baseline.
+# `git status --porcelain` covers every tracked file and any untracked litter;
+# the dkms.conf.orig check names the old `sed -i.orig` backup explicitly.
 assert_clean() {
   _label=$1
   _dirty=$(cd "$sandbox" && git status --porcelain)
   assert_eq "" "$_dirty" "$_label: installer must leave the checkout byte-identical"
   assert_eq "$tracked_before" "$(cat "$sandbox/dkms.conf")" \
     "$_label: tracked dkms.conf must be byte-identical after the run"
+  if [ -e "$sandbox/dkms.conf.orig" ]; then
+    _hda_fail "$_label: the old 'sed -i.orig' backup dkms.conf.orig must not be left behind"
+  fi
+}
+
+# assert_no_stale_staging <label> -- the installer's staging directory must be
+# removed when the installer exits (trap ... EXIT), so no generated file is
+# left behind.  The staging dir is created as ${TMPDIR:-/tmp}/snd-hda-dkms.*.
+assert_no_stale_staging() {
+  _label=$1
+  _stale=$(find "${TMPDIR:-/tmp}" -maxdepth 1 -name 'snd-hda-dkms.*' 2>/dev/null | head -1)
+  assert_eq "" "$_stale" "$_label: installer must remove its staging directory on exit"
+}
+
+# assert_file_absent <path> <msg>
+assert_file_absent() {
+  if [ "$#" -lt 2 ]; then
+    _hda_fail "assert_file_absent: usage: assert_file_absent <path> <msg>"
+    return 1
+  fi
+  if [ ! -e "$1" ]; then
+    return 0
+  fi
+  _hda_fail "$2 (expected no file '$1', but it exists)"
+  return 1
 }
 
 # ---------------------------------------------------------------------------
