@@ -64,12 +64,24 @@ usr_src=${SND_HDA_USR_SRC:-/usr/src}
 src_link="$usr_src/snd_hda_macbookpro-0.1"
 stage_dir="$usr_src/snd_hda_macbookpro-0.1.src"
 
+# remove a non-dkms cs8409 module from $1, in whichever compression the
+# kernel build used, so a stale copy cannot shadow the dkms build
+remove_stale_cs8409() {
+    local dir=$1 ext
+    for ext in ko ko.zst ko.xz ko.gz; do
+        if [[ -e $dir/snd-hda-codec-cs8409.$ext ]]; then
+            rm "$dir/snd-hda-codec-cs8409.$ext"
+            echo "removed $dir/snd-hda-codec-cs8409.$ext"
+        fi
+    done
+}
+
 if [[ $dkms_action == 'install' ]]; then
 
     # we remove any non-dkms module just in case
     # we can only have one dkms module with same file name prefix under the whole /lib/modules/{kernel version} directory
     update_dir="/lib/modules/${UNAME}/updates"
-    [[ -e $update_dir/snd-hda-codec-cs8409.ko ]] && rm $update_dir/snd-hda-codec-cs8409.ko && echo "removed $update_dir/snd-hda-codec-cs8409.ko"
+    remove_stale_cs8409 "$update_dir"
 
     # dkms.sh runs `dkms install -c dkms.conf` from its own directory and
     # symlinks that directory into /usr/src, so dkms reads dkms.conf in place.
@@ -135,12 +147,6 @@ elif [[ $dkms_action == 'remove' ]]; then
         [[ -L $src_link && ! -e $src_link ]] && rm -f "$src_link"
     fi
 
-    # none of this is needed now dkms.sh calls dkms remove - including the depmod
-    # next line needed to properly clean up dkms module
-    # but not needed now we call dkms remove in dkms.sh
-    # (it may be immaterial as the original module wont be loaded in any case as the hardware wont match on Apple machine)
-    #update_dir="/lib/modules/${UNAME}/updates"
-    #[[ -e $update_dir/dkms/snd-hda-codec-cs8409.ko.zst ]] && rm $update_dir/dkms/snd-hda-codec-cs8409.ko.zst && depmod -a && echo "removed $update_dir/dkms/snd-hda-codec-cs8409.ko.zst"
     exit "$rc"
 
 fi

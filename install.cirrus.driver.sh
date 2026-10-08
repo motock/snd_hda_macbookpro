@@ -66,12 +66,24 @@ fi
 
 PATCH_CIRRUS=false
 
+# remove a non-dkms cs8409 module from $1, in whichever compression the
+# kernel build used, so a stale copy cannot shadow the dkms build
+remove_stale_cs8409() {
+    local dir=$1 ext
+    for ext in ko ko.zst ko.xz ko.gz; do
+        if [[ -e $dir/snd-hda-codec-cs8409.$ext ]]; then
+            rm "$dir/snd-hda-codec-cs8409.$ext"
+            echo "removed $dir/snd-hda-codec-cs8409.$ext"
+        fi
+    done
+}
+
 if [[ $dkms_action == 'install' ]]; then
 
     # we remove any non-dkms module just in case
     # we can only have one dkms module with same file name prefix under the whole /lib/modules/{kernel version} directory
     update_dir="/lib/modules/${UNAME}/updates/codecs/cirrus"
-    [[ -e $update_dir/snd-hda-codec-cs8409.ko ]] && rm $update_dir/snd-hda-codec-cs8409.ko && echo "removed $update_dir/snd-hda-codec-cs8409.ko"
+    remove_stale_cs8409 "$update_dir"
 
     # run dkms install script
     rc=0
@@ -99,12 +111,6 @@ elif [[ $dkms_action == 'remove' ]]; then
         echo "dkms remove failed (exit $rc)" >&2
     fi
 
-    # none of this is needed now dkms.sh calls dkms remove - including the depmod
-    # next line needed to properly clean up dkms module
-    # but not needed now we call dkms remove in dkms.sh
-    # (it may be immaterial as the original module wont be loaded in any case as the hardware wont match on Apple machine)
-    #update_dir="/lib/modules/${UNAME}/updates/dkms"
-    #[[ -e $update_dir/snd-hda-codec-cs8409.ko.zst ]] && rm $update_dir/snd-hda-codec-cs8409.ko.zst && depmod -a && echo "removed $update_dir/snd-hda-codec-cs8409.ko.zst"
     exit "$rc"
 
 fi
