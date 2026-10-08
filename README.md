@@ -132,6 +132,43 @@ sudo rm /lib/modules/{kernel version}/updates/snd-hda-codec-cs8409.ko
 sudo depmod -a
 ```
 
+Linux Mint and Ubuntu on kernel 7.0:
+-------------
+
+**Build-tested** on Linux 7.0, x86-64:
+
+* Ubuntu 24.04 / Linux Mint 22.3 with `linux-headers-7.0.0-38-generic` (HWE kernel)
+* Ubuntu 26.04 / Linux Mint 23 with `linux-source-7.0.0`
+
+"Build-tested" means `snd-hda-codec-cs8409.ko` built, its vermagic was
+`7.0.0-38-generic`, and it had no unresolved symbols.
+
+On Ubuntu and Mint the installer prefers the distribution's
+`/usr/src/linux-source-<version>.tar.bz2` when that package is installed. HWE
+kernels usually have no such package. When the file is absent the installer
+prints
+
+```
+linux-source-<version> not found; using mainline kernel <major>.<minor> sources from cdn.kernel.org instead
+(to use the Ubuntu kernel sources instead: sudo apt install linux-source-<version>)
+```
+
+then downloads the mainline `<major>.<minor>` release (for example
+`linux-7.0.tar.xz`) from cdn.kernel.org and verifies its SHA-256 as described
+above. This needs network access and the kernel headers package for the running
+kernel (`linux-headers-<release>`). The mainline sources lack Ubuntu's
+backports, so the build can fail on some kernels.
+
+The cs8409 patches apply to mainline 6.17, 7.0, 7.1 and 7.2; on 7.0 the header
+patch applies with fuzz.
+
+**Limits**
+
+* `make test` runs the bash tests only. They do not run on real iMac hardware
+  and need no kernel headers.
+* I have not verified audio on the iMac 2017 on any 7.x kernel. A successful
+  build says nothing about whether sound works.
+
 Dynamic Kernel Module Support (dkms):
 -------------
 
