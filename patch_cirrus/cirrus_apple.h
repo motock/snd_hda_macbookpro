@@ -2636,8 +2636,10 @@ static int cs8409_apple(struct hda_codec *codec)
         //dump_stack();
 
         spec = cs8409_apple_alloc_spec(codec);
-        if (!spec)
-                return -ENOMEM;
+        if (!spec) {
+                err = -ENOMEM;
+                goto err_free_spec;
+        }
 
 
         spec->vendor_nid = CS8409_VENDOR_NID;
@@ -2682,7 +2684,8 @@ static int cs8409_apple(struct hda_codec *codec)
 
         if (!fixup_found) {
 		dev_err(hda_codec_dev(codec), "UNKNOWN subsystem id 0x%08x",codec->core.subsystem_id);
-                return -ENODEV;
+                err = -ENODEV;
+                goto err_free_spec;
         }
 
 
@@ -3162,6 +3165,17 @@ static int cs8409_apple(struct hda_codec *codec)
 
  error:
        cs_8409_apple_remove(codec);
+       return err;
+
+ err_free_spec:
+       /* The codec has not taken ownership of the spec yet: on probe failure
+        * the HDA core does not call ->remove(), so nothing else would free it.
+        * cs8409_apple_alloc_spec() published it as codec->spec, so clear that
+        * too to avoid a dangling pointer (and a double free if a later remove
+        * path runs).
+        */
+       kfree(spec);
+       codec->spec = NULL;
        return err;
 }
 
