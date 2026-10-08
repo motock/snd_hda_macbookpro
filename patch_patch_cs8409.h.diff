@@ -396,7 +396,7 @@ index d0b725c..d8b5232 100644
  };
  
  /* CS42L42 Specific Definitions */
-@@ -296,6 +302,23 @@
+@@ -299,6 +305,23 @@
  	unsigned int coeff;
  };
  
@@ -420,7 +420,7 @@ index d0b725c..d8b5232 100644
  struct sub_codec {
  	struct hda_codec *codec;
  	unsigned int addr;
-@@ -306,6 +329,9 @@
+@@ -309,6 +332,9 @@
  
  	unsigned int hp_jack_in:1;
  	unsigned int mic_jack_in:1;
@@ -430,7 +430,7 @@ index d0b725c..d8b5232 100644
  	unsigned int suspended:1;
  	unsigned int paged:1;
  	unsigned int last_page;
-@@ -339,6 +365,134 @@
+@@ -342,6 +368,134 @@
  	unsigned int init_done:1;
  	unsigned int build_ctrl_done:1;
  
