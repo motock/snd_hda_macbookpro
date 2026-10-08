@@ -2186,15 +2186,17 @@ static int cs_8409_apple_create_input_ctls(struct hda_codec *codec)
 		for (i = 0; i < imux->num_items; i++) {
 			for (n = 0; n < spec->num_adc_nids; n++) {
 				if (spec->input_paths[i][n]) {
-					struct nid_path *path = NULL;
-					spec->adc_nids[nums] = spec->adc_nids[n];
-					//invalidate_nid_path(codec, spec->input_paths[i][nums]);
-					// this is explicit coding of simple function invalidate_nid_path from hda_generic.c
-					path = snd_hda_get_path_from_idx(codec, spec->input_paths[i][nums]);
-					if (path)
-						memset(path, 0, sizeof(*path));
-					spec->input_paths[i][nums] = spec->input_paths[i][n];
-					spec->input_paths[i][n] = 0;
+					if (n != nums) {
+						struct nid_path *path = NULL;
+						spec->adc_nids[nums] = spec->adc_nids[n];
+						//invalidate_nid_path(codec, spec->input_paths[i][nums]);
+						// this is explicit coding of simple function invalidate_nid_path from hda_generic.c
+						path = snd_hda_get_path_from_idx(codec, spec->input_paths[i][nums]);
+						if (path)
+							memset(path, 0, sizeof(*path));
+						spec->input_paths[i][nums] = spec->input_paths[i][n];
+						spec->input_paths[i][n] = 0;
+					}
 					nums++;
 					// only store first non-zero path per adc
 					break;
