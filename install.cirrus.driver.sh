@@ -164,29 +164,29 @@ elif [ $(grep '^ID=' /etc/os-release | grep -c "ubuntu") -eq 1 ]; then
         isubuntu=1
 fi
 
+use_ubuntu_source=0
+mainline_fallback=0
 if [ $isubuntu -ge 1 ]; then
-
-	# NOTE for Ubuntu we need to use the distribution kernel sources as they seem
+	# NOTE for Ubuntu we prefer the distribution kernel sources as they seem
 	# to be significantly modified from the mainline kernel sources generally with backports from later kernels
 	# (so far the actual debian kernels seem to be close to mainline kernels)
 
-	# NOTA BENE this will likely NOT work for Ubuntu hwe kernels which are even more highly
-        #           modified with extensive backports from later kernel versions
-        #           (and in any case there is no linux-source-... package for hwe kernels)
+	# There is no linux-source-... package for Ubuntu hwe kernels (or kernels newer than the LTS one),
+	# so when it is absent we fall back to the verified mainline sources below.
+	# Those lack the Ubuntu backports, so the build may fail on such kernels.
 
-	if [ ! -e /usr/src/linux-source-$kernel_version.tar.bz2 ]; then
-
-		echo "Ubuntu linux kernel source not found in /usr/src: /usr/src/linux-source-$kernel_version.tar.bz2"
-		echo "assuming the linux kernel source package is not installed"
-		echo "please install the linux kernel source package:"
-		echo "sudo apt install linux-source-$kernel_version"
-		echo "if the above doesn't work because some distros don't use LTS Kernel, download the linux-source-$kernel_version .deb file"
-		echo "using Archive Manager, Open data.tar.zst, extract /usr/src/linux-source-$kernel_version/linux-source-$kernel_version.tar.bz2"
-		echo "NOTE - This does not work for HWE kernels"
-
-		exit 1
-
+	if [ -e /usr/src/linux-source-$kernel_version.tar.bz2 ]; then
+		use_ubuntu_source=1
+	else
+		echo "linux-source-$kernel_version not found; using mainline kernel $major_version.$minor_version sources from cdn.kernel.org instead"
+		echo "(to use the Ubuntu kernel sources instead: sudo apt install linux-source-$kernel_version)"
+		mainline_fallback=1
+		# the full x.y.z tarball is not what we want here, so start from the base x.y release
+		kernel_version=$major_version.$minor_version
 	fi
+fi
+
+if [ $use_ubuntu_source -ge 1 ]; then
 
 	tar --strip-components=2 -xvf /usr/src/linux-source-$kernel_version.tar.bz2 --directory=build/ linux-source-$kernel_version/sound/hda
 
@@ -206,6 +206,9 @@ else
 
 	if [[ $rc -eq 0 ]]; then
 		verify_kernel_tarball $build_dir/linux-$kernel_version.tar.xz $kernel_version || exit 1
+	elif [ $mainline_fallback -ge 1 ]; then
+		echo "kernel $UNAME: failed to download linux-$kernel_version.tar.xz...exiting" >&2
+		exit 1
 	else
 		echo "Failed to download linux-$kernel_version.tar.xz"
 		echo "Trying to download base kernel version linux-$major_version.$minor_version.tar.xz"
