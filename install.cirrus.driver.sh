@@ -195,10 +195,18 @@ else
 
 	set +e
 
+	. "$(dirname "$0")/lib/verify_kernel_tarball.sh"
+
+	# a cached tarball is only reused if it verifies; a bad one is deleted so wget -c cannot resume it
+	[[ -f $build_dir/linux-$kernel_version.tar.xz ]] && { verify_kernel_tarball $build_dir/linux-$kernel_version.tar.xz $kernel_version || true; }
+
 	# attempt to download linux-x.x.x.tar.xz kernel
 	wget -c https://cdn.kernel.org/pub/linux/kernel/v$major_version.x/linux-$kernel_version.tar.xz -P $build_dir
+	rc=$?
 
-	if [[ $? -ne 0 ]]; then
+	if [[ $rc -eq 0 ]]; then
+		verify_kernel_tarball $build_dir/linux-$kernel_version.tar.xz $kernel_version || exit 1
+	else
 		echo "Failed to download linux-$kernel_version.tar.xz"
 		echo "Trying to download base kernel version linux-$major_version.$minor_version.tar.xz"
 		echo "This may lead to build failures as too old"
@@ -206,9 +214,12 @@ else
 		echo ""
    		# if first attempt fails, attempt to download linux-x.x.tar.xz kernel
    		kernel_version=$major_version.$minor_version
+   		[[ -f $build_dir/linux-$kernel_version.tar.xz ]] && { verify_kernel_tarball $build_dir/linux-$kernel_version.tar.xz $kernel_version || true; }
    		wget -c https://cdn.kernel.org/pub/linux/kernel/v$major_version.x/linux-$kernel_version.tar.xz -P $build_dir
+		rc=$?
 
-		[[ $? -ne 0 ]] && echo "kernel could not be downloaded...exiting" >&2 && exit 1
+		[[ $rc -ne 0 ]] && echo "kernel could not be downloaded...exiting" >&2 && exit 1
+		verify_kernel_tarball $build_dir/linux-$kernel_version.tar.xz $kernel_version || exit 1
 	fi
 
 	set -e
