@@ -8,29 +8,29 @@
 // definitions for patch_cirrus_new84.h
 
 
-static void snd_hda_coef_item(struct hda_codec *codec, u16 write_flag, hda_nid_t nid, u32 idx, u32 param, u32 retdata, int srcidx);
+void snd_hda_coef_item(struct hda_codec *codec, u16 write_flag, hda_nid_t nid, u32 idx, u32 param, u32 retdata, int srcidx);
 
-static int snd_hda_coef_item_check(struct hda_codec *codec, u16 write_flag, hda_nid_t nid, u32 idx, u32 param, u32 retdata, int srcidx);
+int snd_hda_coef_item_check(struct hda_codec *codec, u16 write_flag, hda_nid_t nid, u32 idx, u32 param, u32 retdata, int srcidx);
 
-static void snd_hda_coef_item_masked(struct hda_codec *codec, u16 write_flag, hda_nid_t nid, u32 idx, u32 param, u32 mask, u32 retdata, u32 srcval, int srcidx);
+void snd_hda_coef_item_masked(struct hda_codec *codec, u16 write_flag, hda_nid_t nid, u32 idx, u32 param, u32 mask, u32 retdata, u32 srcval, int srcidx);
 
-static void snd_hda_double_reset(struct hda_codec *codec);
+void snd_hda_double_reset(struct hda_codec *codec);
 
-static void cs_8409_play_setup(struct hda_codec *codec);
+void cs_8409_play_setup(struct hda_codec *codec);
 
-static void cs_8409_play_cleanup(struct hda_codec *codec);
+void cs_8409_play_cleanup(struct hda_codec *codec);
 
-static void cs_8409_capture_setup(struct hda_codec *codec);
+void cs_8409_capture_setup(struct hda_codec *codec);
 
-static void cs_8409_capture_cleanup(struct hda_codec *codec);
+void cs_8409_capture_cleanup(struct hda_codec *codec);
 
-static void cs_8409_headplay_setup(struct hda_codec *codec);
+void cs_8409_headplay_setup(struct hda_codec *codec);
 
-static void cs_8409_headplay_cleanup(struct hda_codec *codec);
+void cs_8409_headplay_cleanup(struct hda_codec *codec);
 
-static void cs_8409_headcapture_setup(struct hda_codec *codec);
+void cs_8409_headcapture_setup(struct hda_codec *codec);
 
-static void cs_8409_headcapture_cleanup(struct hda_codec *codec);
+void cs_8409_headcapture_cleanup(struct hda_codec *codec);
 
 
 
@@ -499,10 +499,10 @@ static const struct hda_coef cs8409_init_coef[] = {
 };
 
 
-static void snd_hda_coef_sequence(struct hda_codec *codec, const struct hda_coef *seq, char *prtstr);
+void snd_hda_coef_sequence(struct hda_codec *codec, const struct hda_coef *seq, char *prtstr);
 
 
-static void snd_hda_coef_item(struct hda_codec *codec, u16 write_flag, hda_nid_t nid, u32 idx, u32 param, u32 retdata, int srcidx)
+void snd_hda_coef_item(struct hda_codec *codec, u16 write_flag, hda_nid_t nid, u32 idx, u32 param, u32 retdata, int srcidx)
 {
         if (write_flag == 2)
 	{
@@ -533,7 +533,7 @@ static void snd_hda_coef_item(struct hda_codec *codec, u16 write_flag, hda_nid_t
 }
 
 // just create a special routine if we wish to return the actual value for the moment
-static int snd_hda_coef_item_check(struct hda_codec *codec, u16 write_flag, hda_nid_t nid, u32 idx, u32 param, u32 retdata, int srcidx)
+int snd_hda_coef_item_check(struct hda_codec *codec, u16 write_flag, hda_nid_t nid, u32 idx, u32 param, u32 retdata, int srcidx)
 {
         int retval = 0;
 
@@ -557,7 +557,7 @@ static int snd_hda_coef_item_check(struct hda_codec *codec, u16 write_flag, hda_
         return retval;
 }
 
-static void snd_hda_coef_item_masked(struct hda_codec *codec, u16 write_flag, hda_nid_t nid, u32 idx, u32 param, u32 mask, u32 retdata, u32 srcval, int srcidx)
+void snd_hda_coef_item_masked(struct hda_codec *codec, u16 write_flag, hda_nid_t nid, u32 idx, u32 param, u32 mask, u32 retdata, u32 srcval, int srcidx)
 {
         //int retval = 0;
         if (write_flag != 2)
@@ -576,7 +576,7 @@ static void snd_hda_coef_item_masked(struct hda_codec *codec, u16 write_flag, hd
         //return retval;
 }
 
-static void snd_hda_coef_sequence(struct hda_codec *codec, const struct hda_coef *seq, char *prtstr)
+void snd_hda_coef_sequence(struct hda_codec *codec, const struct hda_coef *seq, char *prtstr)
 {
 	mycodec_info(codec, "start snd_hda_coef_sequence %s\n",prtstr);
         for (; seq->nid; seq++)
@@ -601,7 +601,7 @@ static inline unsigned int snd_hda_codec_read_check(struct hda_codec *codec, hda
 	return retval;
 }
 
-static void snd_hda_double_reset(struct hda_codec *codec)
+void snd_hda_double_reset(struct hda_codec *codec)
 {
 	mycodec_info(codec, "snd_hda_double_reset\n");
 	// still not clear if this does anything
@@ -1163,7 +1163,7 @@ static int cs_8409_boot_setup(struct hda_codec *codec)
 	return err;
 }
 
-static void cs_8409_play_setup(struct hda_codec *codec)
+void cs_8409_play_setup(struct hda_codec *codec)
 {
         struct cs8409_apple_spec *spec = codec->spec;
         myprintk_dbg("snd_hda_intel: cs_8409_play_setup\n");
@@ -1199,7 +1199,7 @@ static void cs_8409_play_setup(struct hda_codec *codec)
 //static void cs_8409_playstop_data_ssm3(struct hda_codec *codec);
 //static void cs_8409_playstop_real_ssm3(struct hda_codec *codec);
 
-static void cs_8409_play_cleanup(struct hda_codec *codec)
+void cs_8409_play_cleanup(struct hda_codec *codec)
 {
         struct cs8409_apple_spec *spec = codec->spec;
         myprintk_dbg("snd_hda_intel: cs_8409_play_cleanup\n");
@@ -1235,7 +1235,7 @@ static void cs_8409_play_cleanup(struct hda_codec *codec)
 // NOTE - so far all systems use the same inputs for internal mike capturing - not sure if
 // there are any subsystem_id differences
 
-static void cs_8409_capture_setup(struct hda_codec *codec)
+void cs_8409_capture_setup(struct hda_codec *codec)
 {
         struct cs8409_apple_spec *spec = codec->spec;
         if (codec->core.subsystem_id == 0x106b3300 || codec->core.subsystem_id == 0x106b3600 || codec->core.subsystem_id == 0x106b3900
@@ -1253,7 +1253,7 @@ static void cs_8409_capture_setup(struct hda_codec *codec)
 }
 
 
-static void cs_8409_capture_cleanup(struct hda_codec *codec)
+void cs_8409_capture_cleanup(struct hda_codec *codec)
 {
         struct cs8409_apple_spec *spec = codec->spec;
         if (codec->core.subsystem_id == 0x106b3300 || codec->core.subsystem_id == 0x106b3600 || codec->core.subsystem_id == 0x106b3900
@@ -1462,7 +1462,7 @@ static void cs_8409_headset_mike_setup_nouse(struct hda_codec *codec)
 }
 
 
-static void cs_8409_headplay_setup(struct hda_codec *codec)
+void cs_8409_headplay_setup(struct hda_codec *codec)
 {
         struct cs8409_apple_spec *spec = codec->spec;
         if (codec->core.subsystem_id == 0x106b3900) {
@@ -1502,7 +1502,7 @@ static void cs_8409_headplay_setup(struct hda_codec *codec)
 }
 
 
-static void cs_8409_headplay_cleanup(struct hda_codec *codec)
+void cs_8409_headplay_cleanup(struct hda_codec *codec)
 {
         struct cs8409_apple_spec *spec = codec->spec;
         if (codec->core.subsystem_id == 0x106b3900) {
@@ -1546,7 +1546,7 @@ static void cs_8409_headplay_cleanup(struct hda_codec *codec)
 // NOTE - so far all systems use the same chip (cs42l83) for headset mike capturing - not sure if
 // there are any subsystem_id differences
 
-static void cs_8409_headcapture_setup(struct hda_codec *codec)
+void cs_8409_headcapture_setup(struct hda_codec *codec)
 {
         struct cs8409_apple_spec *spec = codec->spec;
         if (codec->core.subsystem_id == 0x106b3300 || codec->core.subsystem_id == 0x106b3600 || codec->core.subsystem_id == 0x106b3900
@@ -1572,7 +1572,7 @@ static void cs_8409_headcapture_setup(struct hda_codec *codec)
 }
 
 
-static void cs_8409_headcapture_cleanup(struct hda_codec *codec)
+void cs_8409_headcapture_cleanup(struct hda_codec *codec)
 {
         struct cs8409_apple_spec *spec = codec->spec;
         if (codec->core.subsystem_id == 0x106b3300 || codec->core.subsystem_id == 0x106b3600 || codec->core.subsystem_id == 0x106b3900

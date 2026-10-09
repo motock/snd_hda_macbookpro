@@ -673,27 +673,27 @@ static void debug_show_configs(struct hda_codec *codec,
 
 // definitions for patch_cirrus_apple.h
 
-static void cs_8409_dump_callback(struct hda_codec *codec);
+void cs_8409_dump_callback(struct hda_codec *codec);
 
-static struct hda_jack_callback *
+struct hda_jack_callback *
 cs_8409_hda_jack_detect_enable_callback(struct hda_codec *codec, hda_nid_t nid, int dev_id, int tag,
 				    hda_jack_callback_fn func);
 
-static int cs_8409_apple_build_pcms(struct hda_codec *codec);
+int cs_8409_apple_build_pcms(struct hda_codec *codec);
 
-static void cs_8409_cs42l83_mark_jack(struct hda_codec *codec);
+void cs_8409_cs42l83_mark_jack(struct hda_codec *codec);
 
-static int cs_8409_apple_build_pcms(struct hda_codec *codec);
+int cs_8409_apple_build_pcms(struct hda_codec *codec);
 
-static void cs_8409_cs42l83_mark_jack(struct hda_codec *codec);
+void cs_8409_cs42l83_mark_jack(struct hda_codec *codec);
 
-static void cs_8409_cs42l83_jack_report_sync(struct hda_codec *codec);
+void cs_8409_cs42l83_jack_report_sync(struct hda_codec *codec);
 
-static void cs_8409_cs42l83_jack_report_hp_update(struct hda_codec *codec, int plugin);
+void cs_8409_cs42l83_jack_report_hp_update(struct hda_codec *codec, int plugin);
 
-static void cs_8409_cs42l83_jack_unsol_event(struct hda_codec *codec, unsigned int res);
+void cs_8409_cs42l83_jack_unsol_event(struct hda_codec *codec, unsigned int res);
 
-static void cs_8409_apple_free(struct hda_codec *codec);
+void cs_8409_apple_free(struct hda_codec *codec);
 
 
 
@@ -921,7 +921,7 @@ cs_8409_find_callback_from_list(struct hda_jack_tbl *jack,
 }
 
 // quick debug callback list function
-static void cs_8409_dump_callback(struct hda_codec *codec)
+void cs_8409_dump_callback(struct hda_codec *codec)
 {
         struct hda_jack_tbl *jack = codec->jacktbl.list;
         int i;
@@ -941,7 +941,7 @@ static void cs_8409_dump_callback(struct hda_codec *codec)
 // it appears unsolicited response is pre-enabled
 // but we need to fix this to setup the callback on such responses
 // note that the current (>5.13) callback does not have a tag argument
-static struct hda_jack_callback *
+struct hda_jack_callback *
 cs_8409_hda_jack_detect_enable_callback(struct hda_codec *codec, hda_nid_t nid, int dev_id, int tag,
 				    hda_jack_callback_fn func)
 {
@@ -1495,7 +1495,7 @@ static int cs_8409_apple_build_controls(struct hda_codec *codec)
 	return 0;
 }
 
-static int cs_8409_apple_build_pcms(struct hda_codec *codec)
+int cs_8409_apple_build_pcms(struct hda_codec *codec)
 {
 	int retval;
         struct hda_pcm *pcm;
@@ -1581,7 +1581,7 @@ static void cs8409_fix_caps_debug(struct hda_codec *codec, unsigned int nid)
 
 // set up some local routines we can call in our main code to call the hda functions we need
 
-static void cs_8409_cs42l83_mark_jack(struct hda_codec *codec)
+void cs_8409_cs42l83_mark_jack(struct hda_codec *codec)
 {
         struct hda_jack_tbl *event;
 
@@ -1622,7 +1622,7 @@ static void cs_8409_cs42l83_mark_jack(struct hda_codec *codec)
 }
 
 
-static void cs_8409_cs42l83_jack_report_sync(struct hda_codec *codec)
+void cs_8409_cs42l83_jack_report_sync(struct hda_codec *codec)
 {
         mycodec_info(codec, "cs_8409_cs42l83_jack_report_sync\n");
         snd_hda_jack_report_sync(codec);
@@ -1630,7 +1630,7 @@ static void cs_8409_cs42l83_jack_report_sync(struct hda_codec *codec)
 
 
 // this function is for updating jacks when headphone is plugged in or unplugged
-static void cs_8409_cs42l83_jack_report_hp_update(struct hda_codec *codec, int plugin)
+void cs_8409_cs42l83_jack_report_hp_update(struct hda_codec *codec, int plugin)
 {
         mycodec_info(codec, "cs_8409_cs42l83_jack_report_hp_update: %s\n", (plugin?"plugin":"unplug"));
 
@@ -1643,7 +1643,7 @@ static void cs_8409_cs42l83_unsol_event_handler(struct hda_codec *codec, unsigne
 // so I think this is what gets called for any unsolicited event - including jack plug events
 // so anything we do to switch amp/headphone should be done from here
 
-static void cs_8409_cs42l83_jack_unsol_event(struct hda_codec *codec, unsigned int res)
+void cs_8409_cs42l83_jack_unsol_event(struct hda_codec *codec, unsigned int res)
 {
         struct hda_jack_tbl *event;
         //int ret_unsol_enable = 0;
@@ -1740,7 +1740,7 @@ static void cs_8409_cs42l83_jack_unsol_event(struct hda_codec *codec, unsigned i
 // cs_free is just a definition
 //#define cs_8409_apple_free		snd_hda_gen_free
 
-static void cs_8409_apple_free(struct hda_codec *codec)
+void cs_8409_apple_free(struct hda_codec *codec)
 {
 #if 0
         struct cs8409_spec *spec = codec->spec;

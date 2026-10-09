@@ -27,13 +27,21 @@ REPO_ROOT=$(cd "$SCRIPT_DIR/.." && pwd)
 . "$SCRIPT_DIR/lib/assert.sh"
 
 IN_SCOPE=(
-  patch_cirrus/cirrus_apple.h
-  patch_cirrus/patch_cirrus_apple.h
-  patch_cirrus/patch_cirrus_new84.h
+  patch_cirrus/cs8409.h
+  patch_cirrus/patch_cs8409.h
 )
 
 # "file:function" entries that may stay non-static, one justification each.
+# These prototypes match non-static definitions in cs8409.c / patch_cs8409.c,
+# which are outside this story's scope; making only the prototype static
+# would not compile.
 ALLOW=()
+for f in cs8409.h patch_cs8409.h; do
+  for fn in cs42l42_volume_info cs42l42_volume_get cs42l42_volume_put \
+            cs8409_cs42l42_fixups dolphin_fixups; do
+    ALLOW+=("patch_cirrus/$f:$fn")
+  done
+done
 
 # non_static_functions FILE -- print `name` for each non-static function
 # definition or prototype in FILE.
@@ -57,7 +65,7 @@ violations() {
       [ "$entry" = "${f}:${name}" ] && continue 2
     done
     printf '%s\n' "$name"
-  done < <(non_static_functions "$f")
+  done < <(non_static_functions "$REPO_ROOT/$f")
 }
 
 # --- checker self-test against a negative fixture ---------------------------
@@ -85,7 +93,7 @@ assert_eq $'leaks_symbol\nleaks_split_signature' "$(non_static_functions "$TMP/b
 # --- the in-scope headers ---------------------------------------------------
 for rel in "${IN_SCOPE[@]}"; do
   assert_file_exists "$REPO_ROOT/$rel" "$rel exists"
-  assert_eq "" "$(violations "$REPO_ROOT/$rel")" "$rel has no non-static functions"
+  assert_eq "" "$(violations "$rel")" "$rel has no non-static functions"
 done
 
 finish
