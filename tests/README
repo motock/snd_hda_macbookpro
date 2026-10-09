@@ -573,3 +573,44 @@ host is Ubuntu (and so should use the `linux-source` package). Set
 unset in normal use. A missing or unreadable file behaves like an absent
 `/etc/os-release`: `grep` complains on stderr and the host is treated as
 non-Ubuntu. Covered by `tests/test_installer_os_release.sh`.
+
+## Known limitation: BLOCKED non-dkms installer cases
+
+`tests/test_installer_exit_status.sh` reports six cases as `BLOCKED` when
+the machine cannot drive the installer's non-dkms path (`hda_non_dkms_blocker`
+in `tests/lib/shims.sh`). A BLOCKED case does not fail the file, but its
+assertions do not run.
+
+| Case | Installer |
+| ---- | --------- |
+| `non-dkms, make install failed` | `install.cirrus.driver.sh`, `install.cirrus.driver.pre617.sh` |
+| `non-dkms, wget failed` | both |
+| `non-dkms, tar failed` | both |
+
+`SND_HDA_USR_SRC` does not unblock them. It redirects only the staged tree
+(`$usr_src/snd_hda_macbookpro-0.1` and `.src`, pre-6.17 installer, dkms path).
+Neither blocker consults it:
+
+1. The kernel-headers probe tests the absolute paths `/usr/src/linux-headers-<uname>`,
+   `/usr/src/kernels/<uname>`, `/usr/lib/modules/<uname>` and
+   `/usr/src/kernel-headers-<uname>` (`install.cirrus.driver.sh:151-163`,
+   `pre617:200-212`).
+2. `mkdir "$update_dir"` under `/lib/modules/<uname>/updates`
+   (`install.cirrus.driver.sh:344`, `pre617:389`) runs without `sudo`, so it
+   needs root.
+
+Without both, the installer exits 1 before the code under test. The exact
+messages, as printed today:
+
+* no headers:
+  `no kernel headers for <uname>: none of /usr/src/linux-headers-<uname>, /usr/src/kernels/<uname>, /usr/lib/modules/<uname>, /usr/src/kernel-headers-<uname> exists, and /usr/src is not writable, so the installer exits 1 at its headers probe (install.cirrus.driver.sh:126, pre617:143) before the code under test`
+* headers present, no root:
+  `<dir> exists but <moddir>/<uname>/updates cannot be created (needs root), so the installer exits at its `mkdir $update_dir` (install.cirrus.driver.sh:303) before the code under test`
+
+(The line numbers inside those messages are as printed by the helper and have
+drifted from the current installers; the paths above are current.)
+
+The cases run, rather than block, on a Linux host that has the headers
+installed and where the test user can create `/lib/modules/<uname>/updates`
+(root). Driving them elsewhere would need an installer test seam, which is out
+of scope for this limitation note.
