@@ -1,9 +1,8 @@
 name: build
 
 # Compiles cs8409.o against the pinned kernels (tests/kernel-pins.conf) with
-# lib/ci_build_check.sh; a compiler error fails the leg, and warning counts are
-# ratcheted against tests/ci/build-warning-baseline.<pin>.txt (the full log is
-# uploaded as an artifact per leg).
+# lib/ci_build_check.sh; a compiler error fails the leg, warnings are only
+# reported (the full log is uploaded as an artifact per leg).
 #
 # Out of scope: the pre-6.17 installer path (install.cirrus.driver.pre617.sh)
 # and kernels beyond the pins (6.17.13 = "new", 7.1.13 = "7x").
