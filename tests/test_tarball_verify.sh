@@ -157,11 +157,16 @@ installer_rejects_bad_tarball() {
   # the downloaded tarball hashes to something other than the published sum
   write_sums "$(printf '0%.0s' $(seq 64))  linux-$VERSION.tar.xz"
   prepare_installer "$_script" || { assert_eq prepared failed "$_script sandbox"; return; }
+  # these cases assume a non-Ubuntu host; pin it so an Ubuntu runner does not take the distro-source path
+  _osrel=$(make_tmpdir)/os-release
+  printf 'NAME="Fedora Linux"\nID=fedora\n' > "$_osrel"
+  HDA_OS_RELEASE=$_osrel; export HDA_OS_RELEASE
   # fake wget ahead of the logging shims; real tar is never reached
   HDA_SHIMS_SAVED=$HDA_SHIMS
   HDA_SHIMS="$FAKE_BIN:$HDA_SHIMS"
   hda_installer_run "$_script" -k "$_uname"
   HDA_SHIMS=$HDA_SHIMS_SAVED
+  unset HDA_OS_RELEASE
   assert_ne 0 "$HDA_INSTALLER_RC" "$_script exits non-zero when verification fails"
   assert_contains "$HDA_INSTALLER_OUTPUT" "mismatch" "$_script reports the mismatch"
   hda_assert_shim_called wget "-P $(cd "$HDA_SANDBOX" && pwd)/build" "$_script must actually reach the download"
