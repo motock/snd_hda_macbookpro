@@ -1631,30 +1631,6 @@ static void read_virtual_widgets(struct hda_codec *codec)
 
 }
 
-static void setup_jack_pin_config(struct hda_codec *codec)
-{
-
-        //int retval;
-        struct cs8409_apple_spec *spec = codec->spec;
-
-        // this is likely some call of setPinConfigDefault
-	// 0x45 -> 0x23 (macbook pro) is the line in path - so why does it say its a mike??
-
-        //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000000); // 0x00170500
-        //hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D0);
-
-        snd_hda_codec_write(codec, spec->linein_nid, 0, AC_VERB_SET_CONFIG_DEFAULT_BYTES_0, 0x00000001); // 0x04571c01
-        snd_hda_codec_write(codec, spec->linein_nid, 0, AC_VERB_SET_CONFIG_DEFAULT_BYTES_1, 0x00000001); // 0x04571d01
-        snd_hda_codec_write(codec, spec->linein_nid, 0, AC_VERB_SET_CONFIG_DEFAULT_BYTES_2, 0x000000a0); // 0x04571ea0
-        snd_hda_codec_write(codec, spec->linein_nid, 0, AC_VERB_SET_CONFIG_DEFAULT_BYTES_3, 0x00000090); // 0x04571f90
-//      snd_hda:     pin config 0x90a00101 port conn 2 location 0x10 loc ext 1 loc geom 0 default device 10 conn type 0 color 0 misc 1 def assoc 0 seq 1
-//      snd_hda:     pin config 0x90a00101 port conn Fixed loc ext Int loc geom N/A default device Mic In conn type Unknown color Unknown misc Jack Detect Override def assoc 0 seq 1
-
-        //snd_hda_codec_write(codec, codec->core.afg, 0, AC_VERB_SET_POWER_STATE, 0x00000003); // 0x00170503
-        //hda_set_node_power_state(codec, codec->core.afg, AC_PWRST_D3);
-
-}
-
 static void enable_i2c(struct hda_codec *codec)
 {
         //int retval;
@@ -2417,7 +2393,6 @@ static void cs42l83_tip_sense(struct hda_codec *codec, int invert)
 {
         int retval;
         int newval1;
-        int newval2;
         int newval;
         //int invert = 0;
 
