@@ -23,7 +23,6 @@ REPO_ROOT=$(cd "$SCRIPT_DIR/.." && pwd)
 
 IN_SCOPE=(
   patch_cirrus/cirrus_apple.h
-  patch_cirrus/patch_cirrus_apple.h
   patch_cirrus/patch_cirrus_new84.h
 )
 
