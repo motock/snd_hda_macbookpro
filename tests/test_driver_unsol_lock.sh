@@ -171,16 +171,19 @@ elif [ -f tests/test_hooks_apply.sh ]; then
     printf 'skip - tests/test_hooks_apply.sh skipped (rc=77)\n'
   else
     applied_line=$(grep -o 'hooks applied: [0-9]* of [0-9]* in play' "$hooks_log" | tail -1)
-    # Drop the two known-drift failures: the per-hook "applied with offset"
-    # lines and the assertion-count line that only counts them.
+    # Recognise the known drift by the stable `FAIL: <assertion>` lines only;
+    # patch's own wording (BSD "hunks failed" vs GNU "N out of M hunks FAILED")
+    # differs per platform and is never matched.  Known: the per-hook "applied
+    # with offset" lines for the old tree, the negative-case line that greps
+    # patch's "hunks failed" wording (fails under GNU patch), and the
+    # assertion-count line that only counts them.
     bad_failures=$(grep '^FAIL' "$hooks_log" \
-                   | grep -v 'applied with offset' \
-                   | grep -v 'assertion(s) failed' || true)
+                   | grep -Ev '^FAIL: old: .* applied with offset to |^FAIL: the failure says the hunk did not apply|^FAIL: [0-9]+ assertion\(s\) failed' || true)
     if printf '%s' "$applied_line" | grep -q 'hooks applied: 5 of 5 in play' \
        && [ -z "$bad_failures" ]; then
       ok "hooks apply to both pinned trees ($applied_line); only the xfail-listed offset drift remains"
     else
-      bad "tests/test_hooks_apply.sh regressed (rc=$hooks_rc); tail:"
+      bad "tests/test_hooks_apply.sh regressed (rc=$hooks_rc); unexpected FAIL lines: ${bad_failures:-none}; tail:"
       tail -20 "$hooks_log"
     fi
   fi
