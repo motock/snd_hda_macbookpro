@@ -1177,7 +1177,6 @@ static bool cs_8409_unsol_pending(struct cs8409_apple_spec *spec)
 	return pending;
 }
 
-// routine to clear unsol list
 static void cs_8409_cs42l83_unsolicited_response_finalize(struct hda_codec *codec, unsigned int res);
 
 static void cs_8409_perform_external_device_unsolicited_responses(struct hda_codec *codec)
@@ -1497,7 +1496,6 @@ static void cs_8409_pcm_playback_pre_prepare_hook(struct hda_pcm_stream *hinfo, 
 		}
 
 		if (spec->play_init_count == 1) {
-
 			// for the moment have junky test here
 			if (spec->jack_present)
 			{
