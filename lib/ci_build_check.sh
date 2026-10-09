@@ -18,8 +18,9 @@
 # is then checked against that pin's SHA-256.
 #
 # Exit status:
-#   0  cs8409.o compiled with no "error:" and no "warning:" compiler line
-#   1  patch failure, .rej file, compiler diagnostic, missing cs8409.o,
+#   0  cs8409.o compiled with no "error:" compiler line (warnings are
+#      counted and reported, never fatal; enforcement is a separate step)
+#   1  patch failure, .rej file, compiler error, missing cs8409.o,
 #      checksum mismatch, download failure or missing build tool
 #   2  bad invocation: no argument, unknown pin, missing tarball (usage shown)
 #
@@ -28,9 +29,17 @@
 # tolerated: ci_build_verdict ignores exactly those modpost messages and
 # never filters compiler diagnostics.
 #
-# Manual check that a warning fails the build (about as slow as a real run):
-#     CI_BUILD_CHECK_INJECT_WARNING=1 lib/ci_build_check.sh new; echo $?
-# appends a "#warning" to cs8409.c in the scratch copy only; expect exit 1.
+# CONFIG_WERROR is switched off in the scratch .config, as distro kernels do
+# (Ubuntu 7.0.0-38 builds this driver with -Werror off and a full warning
+# list), and the build log is the complete, uncapped make output: nothing in
+# this script or the Makefile limits diagnostics (no -fmax-errors, head or
+# tail on the build output).  Set CI_BUILD_LOG_DIR=<dir> to also keep that
+# log as <dir>/build-linux-<version>.log for upload as a CI artifact.
+#
+# Manual check that a compiler error fails the build (about as slow as a real
+# run):
+#     CI_BUILD_CHECK_INJECT_ERROR=1 lib/ci_build_check.sh new; echo $?
+# appends a syntax error to cs8409.c in the scratch copy only; expect exit 1.
 #
 # The kernel tarball is untrusted: it is unpacked into a scratch directory
 # outside the repository, removed on exit, and nothing in it is run except by
@@ -47,7 +56,7 @@ _CBC_MODPOST_OK='^(ERROR|WARNING): modpost: ("[^"]*" \[[^]]*\] undefined!|Symbol
 
 # ci_build_verdict <logfile> <make_rc> <cs8409.o path> -- print the
 # diagnostic counts and decide.  Returns 0 only when cs8409.o is non-empty,
-# the compiler log has no "error:" / "warning:" line, and a non-zero make
+# the compiler log has no "error:" line, and a non-zero make
 # status is explained by the expected modpost messages alone.
 ci_build_verdict() {
   local log=$1 rc=$2 obj=$3 errs warns modpost_ok other verdict=0
@@ -61,8 +70,8 @@ ci_build_verdict() {
     echo "FAIL: cs8409.o was not produced" >&2
     verdict=1
   fi
-  if [ "$errs" -ne 0 ] || [ "$warns" -ne 0 ]; then
-    echo "FAIL: compiler reported $errs error(s) and $warns warning(s)" >&2
+  if [ "$errs" -ne 0 ]; then
+    echo "FAIL: compiler reported $errs error(s)" >&2
     verdict=1
   fi
   if [ "$other" -ne 0 ]; then
@@ -84,7 +93,7 @@ cbc_usage() {
   echo "  7x     build against the pinned 7.x kernel" >&2
   echo "  path   a pinned kernel tarball; its SHA-256 is verified against the pin" >&2
   echo "  -h     show this help (exit 0)" >&2
-  echo "env: HDA_TEST_CACHE, HDA_KERNEL_MIRROR, CI_BUILD_CHECK_INJECT_WARNING=1" >&2
+  echo "env: HDA_TEST_CACHE, HDA_KERNEL_MIRROR, CI_BUILD_LOG_DIR, CI_BUILD_CHECK_INJECT_ERROR=1" >&2
 }
 
 cbc_die() {
@@ -242,9 +251,9 @@ cbc_main() {
   if [ -n "$(find "$stage" -name '*.rej')" ]; then
     cbc_die "patching left .rej files"
   fi
-  if [ "${CI_BUILD_CHECK_INJECT_WARNING:-}" = 1 ]; then
-    echo "== injecting a deliberate #warning into the scratch cs8409.c"
-    echo '#warning ci_build_check injected warning' >>"$hda/codecs/cirrus/cs8409.c"
+  if [ "${CI_BUILD_CHECK_INJECT_ERROR:-}" = 1 ]; then
+    echo "== injecting a deliberate syntax error into the scratch cs8409.c"
+    echo 'int ci_build_check_injected_error = ;' >>"$hda/codecs/cirrus/cs8409.c"
   fi
 
   cbc_step "defconfig" "$SCRATCH/defconfig.log" make -C "$ksrc" defconfig
@@ -258,16 +267,27 @@ CONFIG_SND_HDA_INTEL=m
 CONFIG_SND_HDA_CODEC_CIRRUS=m
 CONFIG_SND_HDA_CODEC_CS8409=m
 EOF
+  # Distro kernels build without -Werror, so warnings never stop their build;
+  # mirror that so the full warning list is reported instead of the first
+  # fatal one (Ubuntu 7.0.0-38 evidence).
+  "$ksrc/scripts/config" --file "$cfg" --disable WERROR ||
+    cbc_die "cannot disable CONFIG_WERROR"
   cbc_step "olddefconfig" "$SCRATCH/olddefconfig.log" make -C "$ksrc" olddefconfig
   for o in CONFIG_SND_HDA_CODEC_CIRRUS=m CONFIG_SND_HDA_CODEC_CS8409=m; do
     grep -qx "$o" "$cfg" || cbc_die "$o did not survive olddefconfig"
   done
+  ! grep -q '^CONFIG_WERROR=y' "$cfg" || cbc_die "CONFIG_WERROR is still enabled after olddefconfig"
   grep -Eq '^CONFIG_SND_HDA=[my]$' "$cfg" || cbc_die "CONFIG_SND_HDA is not enabled after olddefconfig"
   cbc_step "modules_prepare" "$SCRATCH/prepare.log" make -C "$ksrc" -j"$jobs" modules_prepare
 
   echo "== build modules (CFLAGS_MODULE=$cflags)"
   make -C "$ksrc" -j"$jobs" "CFLAGS_MODULE=$cflags" "M=$hda" modules >"$SCRATCH/build.log" 2>&1 || rc=$?
   cat "$SCRATCH/build.log"
+  if [ -n "${CI_BUILD_LOG_DIR:-}" ]; then
+    mkdir -p "$CI_BUILD_LOG_DIR" &&
+      cp "$SCRATCH/build.log" "$CI_BUILD_LOG_DIR/build-linux-$KVER.log" ||
+      cbc_die "cannot write the build log to $CI_BUILD_LOG_DIR"
+  fi
 
   echo "== verdict (linux-$KVER)"
   o=$hda/codecs/cirrus/cs8409.o

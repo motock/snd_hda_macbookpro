@@ -1,7 +1,8 @@
 name: build
 
 # Compiles cs8409.o against the pinned kernels (tests/kernel-pins.conf) with
-# lib/ci_build_check.sh; any compiler warning or error fails the leg.
+# lib/ci_build_check.sh; a compiler error fails the leg, warnings are only
+# reported (the full log is uploaded as an artifact per leg).
 #
 # Out of scope: the pre-6.17 installer path (install.cirrus.driver.pre617.sh)
 # and kernels beyond the pins (6.17.13 = "new", 7.1.13 = "7x").
@@ -55,7 +56,17 @@ jobs:
             libncurses-dev xz-utils patch curl ca-certificates python3
 
       - name: Build cs8409.o on the pinned kernel
+        env:
+          CI_BUILD_LOG_DIR: build-logs
         run: bash lib/ci_build_check.sh ${{ matrix.pin }}
+
+      - name: Upload the full build log
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: build-log-${{ matrix.pin }}
+          path: build-logs/
+          if-no-files-found: warn
 
   # Single stable check name for branch protection: fails unless every
   # matrix leg succeeded (a skipped or cancelled leg is not a pass).
