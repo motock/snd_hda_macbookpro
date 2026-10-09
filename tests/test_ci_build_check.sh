@@ -3,7 +3,7 @@
 # tests/test_ci_build_check.sh -- usage, negative paths and the verdict logic
 # of lib/ci_build_check.sh.  Fully offline: no kernel is fetched or built.
 # The real compile runs in CI (and by hand, see the script header), including
-# the deliberate-warning check (CI_BUILD_CHECK_INJECT_WARNING=1), which takes
+# the deliberate-error check (CI_BUILD_CHECK_INJECT_ERROR=1), which takes
 # a full kernel configure and is far over the 60s this suite allows a test.
 
 set -u
@@ -55,6 +55,17 @@ assert_contains "$(cat "$SCRATCH/out")" "checksum mismatch" "the bad SHA is repo
 
 assert_eq "" "$(ls "$TMPDIR")" "no scratch dir is left behind by any failed invocation"
 
+# --- injected syntax error: a real compiler diagnostic must fail the verdict --
+
+if command -v cc >/dev/null 2>&1; then
+  cp "$REPO_ROOT/patch_cirrus/patch_cirrus_boot84.h" "$SCRATCH/scratch_copy.h"
+  echo 'int ci_injected_error = ;' >>"$SCRATCH/scratch_copy.h"
+  echo obj >"$SCRATCH/inj.o"
+  cc -fsyntax-only -x c "$SCRATCH/scratch_copy.h" >"$SCRATCH/inj.log" 2>&1
+  ci_build_verdict "$SCRATCH/inj.log" 0 "$SCRATCH/inj.o" >/dev/null 2>&1
+  assert_eq 1 "$?" "a syntax error injected into a scratch header copy fails the verdict"
+fi
+
 # --- verdict (fixture logs) ---------------------------------------------------
 
 OBJ="$SCRATCH/cs8409.o"
@@ -72,8 +83,9 @@ $MODPOST
 make[2]: *** [scripts/Makefile.modpost:145: __modpost] Error 1" 2 "$OBJ")" \
   "clean compile with only the expected modpost undefined symbols passes"
 assert_eq 0 "$(verdict "  CC [M]  cs8409.o" 0 "$OBJ")" "clean compile and make exit 0 passes"
-assert_eq 1 "$(verdict "cs8409.c:10:5: warning: unused variable 'x' [-Wunused-variable]
-$MODPOST" 2 "$OBJ")" "a compiler warning fails even next to expected modpost output"
+assert_eq 0 "$(verdict "cs8409.c:10:5: warning: unused variable 'x' [-Wunused-variable]
+$MODPOST" 2 "$OBJ")" "a compiler warning is reported but does not fail the build"
+assert_contains "$(ci_build_verdict "$SCRATCH/log" 2 "$OBJ" 2>&1)" "warnings=1" "the warning count is printed"
 assert_eq 1 "$(verdict "cs8409.c:10:5: error: 'x' undeclared
 $MODPOST" 2 "$OBJ")" "a compiler error fails"
 assert_eq 1 "$(verdict "$MODPOST" 2 "$SCRATCH/missing.o")" "a missing cs8409.o fails"
