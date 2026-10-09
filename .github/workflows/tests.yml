@@ -1,0 +1,66 @@
+name: tests
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+# One run per ref. Only PR runs are cancelled by a newer push; master pushes
+# always run to completion.
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # Pinned: tests/shellcheck-baseline.txt is a ratchet against this version.
+  # The release publishes no checksum file; the SHA-256 was computed from the
+  # downloaded tarball and matches the digest GitHub reports for the asset.
+  SHELLCHECK_VERSION: "0.11.0"
+  SHELLCHECK_SHA256: "8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198"
+
+jobs:
+  tests:
+    name: tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set kernel tarball cache dir
+        run: echo "HDA_TEST_CACHE=$HOME/.cache/snd_hda_macbookpro-tests" >> "$GITHUB_ENV"
+
+      # A miss only costs time: the tests download and verify the tarballs.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ env.HDA_TEST_CACHE }}
+          key: kernel-tarballs-${{ hashFiles('tests/kernel-pins.conf') }}
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends xz-utils patch gcc curl
+
+      - name: Install pinned shellcheck
+        run: |
+          set -euo pipefail
+          tarball="shellcheck-v${SHELLCHECK_VERSION}.linux.x86_64.tar.xz"
+          dir=$(mktemp -d)
+          curl -fsSL --retry 3 -o "$dir/$tarball" \
+            "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/${tarball}"
+          echo "${SHELLCHECK_SHA256}  $dir/$tarball" | sha256sum -c -
+          tar -xJf "$dir/$tarball" -C "$dir"
+          sudo install -m 0755 "$dir/shellcheck-v${SHELLCHECK_VERSION}/shellcheck" /usr/local/bin/shellcheck
+          shellcheck --version | grep -Fx "version: ${SHELLCHECK_VERSION}"
+
+      - name: Run test suite
+        run: |
+          set -o pipefail
+          bash tests/run.sh | tee run.out
+
+      - name: Gate on results
+        run: bash tests/ci/gate.sh run.out
