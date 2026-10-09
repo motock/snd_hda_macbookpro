@@ -43,3 +43,15 @@ commands its not clear if other formats can be supported in the 8409 itself.
 It appears now that Apples set up can take eg S24_LE format and S32_LE format, and these are the formats the driver
 exposes (see README.md).
 
+
+
+Where the Apple code is spliced into cs8409.c (HDA-39):
+
+The hooks (patch_cs8409.c.diff, patch_patch_cs8409.c.diff) forward-declare cs8409_apple() / patch_cs8409_apple()
+just above the kernel's probe function, call it from the probe path, and `#include` the Apple header after
+`module_hda_codec_driver()` - the last of the kernel's own definitions - instead of mid-file.  This is feasible
+because the header only needs symbols defined before that point (cs8409_probe, cs8409_remove, the hda_codec_ops
+types); it defines nothing the kernel's remaining lines use.  The include is deliberately NOT at the literal end
+of the file: 7.x kernels add a MODULE_IMPORT_NS() line after MODULE_DESCRIPTION, and a hunk anchored at end of
+file then applies with fuzz or fails.  The patch tests prove the hooks apply cleanly; compiling the patched file
+against kernel headers is not done in the test suite and needs hardware validation before merge.

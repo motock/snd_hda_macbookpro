@@ -2,16 +2,16 @@ diff --git a/kernel_sources/patch_cs8409.c b/patch_cirrus/patch_cs8409.c
 index aff2b5a..7e9c07c 100644
 --- a/kernel_sources/patch_cs8409.c
 +++ b/patch_cirrus/patch_cs8409.c
-@@ -1270,6 +1270,8 @@ void dolphin_fixups(struct hda_codec *codec, const struct hda_fixup *fix, int ac
+@@ -1439,6 +1439,8 @@
+ 		break;
  	}
  }
- 
-+static int patch_cs8409_apple(struct hda_codec *codec);
 +
++static int patch_cs8409_apple(struct hda_codec *codec);
+ 
  static int patch_cs8409(struct hda_codec *codec)
  {
- 	int err;
-@@ -1277,8 +1279,19 @@ static int patch_cs8409(struct hda_codec *codec)
+@@ -1447,8 +1449,19 @@
  	if (!cs8409_alloc_spec(codec))
  		return -ENOMEM;
  
@@ -31,16 +31,15 @@ index aff2b5a..7e9c07c 100644
  	codec_dbg(codec, "Picked ID=%d, VID=%08x, DEV=%08x\n", codec->fixup_id,
  			 codec->bus->pci->subsystem_vendor,
  			 codec->bus->pci->subsystem_device);
-@@ -1295,6 +1308,12 @@ static int patch_cs8409(struct hda_codec *codec)
- 	return 0;
- }
+@@ -1477,4 +1490,11 @@
+ module_hda_codec_driver(cs8409_driver);
  
-+
-+// for the moment split the new code into an include file
-+
++// Keep this the last include: the Apple code is spliced in after everything the
++// kernel defines (cs8409_probe, the ops table, the driver), so it can name any
++// of them.  cs8409_apple() is forward-declared above cs8409_probe() for the
++// call spliced into it.  It sits before the trailing MODULE_* lines rather than
++// at end of file so the hunk does not depend on how many of them a kernel has.
 +#include "patch_cirrus_apple.h"
 +
-+
- static const struct hda_device_id snd_hda_id_cs8409[] = {
- 	HDA_CODEC_ENTRY(0x10138409, "CS8409", patch_cs8409),
- 	{} /* terminator */
+ MODULE_LICENSE("GPL");
+ MODULE_DESCRIPTION("Cirrus Logic HDA bridge");

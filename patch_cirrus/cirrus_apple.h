@@ -1770,7 +1770,8 @@ void cs_8409_apple_remove(struct hda_codec *codec)
 //
 // The original probe is the kernel's own cs8409_probe, and it is in scope
 // here: the hook that pulls this file in (patch_cs8409.c.diff) inserts
-// `#include "cirrus_apple.h"` into cs8409.c after cs8409_probe's definition.
+// `#include "cirrus_apple.h"` into cs8409.c after module_hda_codec_driver(), the
+// last of the kernel's own definitions.
 // Naming it directly is preferred over saving the old pointer in a file-static
 // and calling it through a wrapper: it is the same function, it is visible at
 // this point, and the table stays self-describing.
