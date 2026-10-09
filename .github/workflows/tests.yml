@@ -46,7 +46,7 @@ jobs:
       - name: Install build tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends xz-utils patch gcc curl
+          sudo apt-get install -y --no-install-recommends xz-utils patch gcc curl sox
 
       - name: Install pinned shellcheck
         run: |
