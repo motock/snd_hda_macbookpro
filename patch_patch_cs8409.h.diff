@@ -375,13 +375,13 @@ index d0b725c..d8b5232 100644
 +	CS8409_SPI_TX_DATA,		// reg 0x60
 +	CS8409_SPI_RX_DATA,		// reg 0x61
 +	CS8409_SPI_STS,			// reg 0x62
-+	CS8409_PFE_COEF_W1, 		// reg 0x63	/* Parametric filter engine coefficient write 1*/
++	CS8409_PFE_COEF_W1,		// reg 0x63 - parametric filter engine coefficient write 1
 +	CS8409_PFE_COEF_W2,		// reg 0x64
 +	CS8409_PFE_CTRL1,		// reg 0x65
 +	CS8409_PFE_CTRL2,		// reg 0x66
 +	CS8409_PRE_SCALE_ATTN1,		// reg 0x67
 +	CS8409_PRE_SCALE_ATTN2,		// reg 0x68
-+	CS8409_PFE_COEF_MON1,		// reg 0x69	/* Parametric filter engine coefficient monitor 1*/
++	CS8409_PFE_COEF_MON1,		// reg 0x69 - parametric filter engine coefficient monitor 1
 +	CS8409_PFE_COEF_MON2,		// reg 0x6a
 +	CS8409_ASP1_INTRN_STS,		// reg 0x6b
 +	CS8409_ASP2_INTRN_STS,		// reg 0x6c

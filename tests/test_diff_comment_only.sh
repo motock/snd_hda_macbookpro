@@ -14,8 +14,13 @@
 #      initialiser in the kernel header), so no two members share a value
 #   R3 rewriting those comments leaves the patched header's code untouched
 #
-# Skips (77) when there is no host cc, or the pinned >= 6.17 tarball is not
-# cached (R2/R3 only; R1 still runs).
+# Checks (HDA-33, patch_patch_cs8409.h.diff, pinned < 6.17 tree):
+#   R4 the hook applies in installer order and its nid/reg comments equal the
+#      member's position in the enum
+#   R5 no enum member carries two comments
+#
+# Skips (77) when there is no host cc, or the pinned tarball is not cached
+# (R2/R3 need the >= 6.17 one, R4-R5 the < 6.17 one; R1 always runs).
 
 TEST_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 . "$TEST_DIR/lib/assert.sh"
@@ -90,6 +95,18 @@ enum_comment_mismatches() {
     }' "$1"
 }
 
+# enum_multi_comment_members <header> <enum-name> -- print each member line
+# that carries more than one comment (// or /* */).
+enum_multi_comment_members() {
+  awk -v name="$2" '
+    $0 ~ "^enum " name " \\{" { on = 1; next }
+    on && /^\};/ { on = 0 }
+    on && /^\t[A-Za-z0-9_]+/ {
+      n = gsub(/\/\/|\/\*/, "&")
+      if (n > 1) print $1
+    }' "$1"
+}
+
 [ "${BASH_SOURCE[0]}" = "$0" ] || return 0
 
 command -v cc >/dev/null 2>&1 || skip "no host cc"
@@ -108,30 +125,61 @@ fi
 . "$TEST_DIR/kernel-pins.conf" || { _hda_fail "cannot read kernel-pins.conf"; finish; }
 cache=${HDA_TEST_CACHE:-${XDG_CACHE_HOME:-$HOME/.cache}/snd_hda_macbookpro-tests}
 tarball="$cache/tarballs/$PIN_NEW_TARBALL"
-[ -f "$tarball" ] || skip "pinned $PIN_NEW_VERSION tarball not cached"
+have_new=1
+[ -f "$tarball" ] || have_new=0
 
-hda="$WORK/hda"
-mkdir -p "$hda/codecs/cirrus"
-tar -xf "$tarball" -C "$WORK" --strip-components=5 \
-  "linux-$PIN_NEW_VERSION/sound/hda/codecs/cirrus/cs8409.h" ||
-  { _hda_fail "cannot extract cs8409.h from $PIN_NEW_TARBALL"; finish; }
-mv "$WORK/cs8409.h" "$hda/codecs/cirrus/cs8409.h"
-patch --batch --no-backup-if-mismatch -p1 -d "$hda" < "$REPO_ROOT/patch_cs8409.h.diff" >/dev/null 2>&1
-assert_eq 0 "$?" "R2 patch_cs8409.h.diff applies to the pinned $PIN_NEW_VERSION tree"
-patched="$hda/codecs/cirrus/cs8409.h"
+if [ "$have_new" = 1 ]; then
+  hda="$WORK/hda"
+  mkdir -p "$hda/codecs/cirrus"
+  tar -xf "$tarball" -C "$WORK" --strip-components=5 \
+    "linux-$PIN_NEW_VERSION/sound/hda/codecs/cirrus/cs8409.h" ||
+    { _hda_fail "cannot extract cs8409.h from $PIN_NEW_TARBALL"; finish; }
+  mv "$WORK/cs8409.h" "$hda/codecs/cirrus/cs8409.h"
+  patch --batch --no-backup-if-mismatch -p1 -d "$hda" < "$REPO_ROOT/patch_cs8409.h.diff" >/dev/null 2>&1
+  assert_eq 0 "$?" "R2 patch_cs8409.h.diff applies to the pinned $PIN_NEW_VERSION tree"
+  patched="$hda/codecs/cirrus/cs8409.h"
 
-assert_eq "" "$(enum_comment_mismatches "$patched" cs8409_pins nid)" \
-  "R2 every cs8409_pins '// nid' comment equals the member's position"
-assert_eq "" "$(enum_comment_mismatches "$patched" cs8409_coefficient_index_registers reg)" \
-  "R2 every coefficient '// reg' comment equals the member's position"
+  assert_eq "" "$(enum_comment_mismatches "$patched" cs8409_pins nid)" \
+    "R2 every cs8409_pins '// nid' comment equals the member's position"
+  assert_eq "" "$(enum_comment_mismatches "$patched" cs8409_coefficient_index_registers reg)" \
+    "R2 every coefficient '// reg' comment equals the member's position"
 
-# the checker itself must flag a duplicated comment
-sed 's|// nid 0x03|// nid 0x02|' "$patched" > "$WORK/dup.h"
-assert_contains "$(enum_comment_mismatches "$WORK/dup.h" cs8409_pins nid)" "expected" \
-  "R2 control: a duplicated nid comment is reported"
+  # the checker itself must flag a duplicated comment
+  sed 's|// nid 0x03|// nid 0x02|' "$patched" > "$WORK/dup.h"
+  assert_contains "$(enum_comment_mismatches "$WORK/dup.h" cs8409_pins nid)" "expected" \
+    "R2 control: a duplicated nid comment is reported"
 
-sed -e 's|// nid 0x[0-9a-f]*|// nid 0xff|' -e 's|// reg 0x[0-9a-f]*|// reg 0xff|' "$patched" > "$WORK/garbled.h"
-assert_comment_only_change "$WORK/garbled.h" "$patched" \
-  "R3 the nid/reg comments are the only difference from a garbled copy"
+  sed -e 's|// nid 0x[0-9a-f]*|// nid 0xff|' -e 's|// reg 0x[0-9a-f]*|// reg 0xff|' "$patched" > "$WORK/garbled.h"
+  assert_comment_only_change "$WORK/garbled.h" "$patched" \
+    "R3 the nid/reg comments are the only difference from a garbled copy"
+fi
+
+# --- R4-R6: the pre-6.17 hook, applied in installer order ---------------------
+old_tarball="$cache/tarballs/$PIN_OLD_TARBALL"
+if [ -f "$old_tarball" ]; then
+  old="$WORK/old-tree"
+  mkdir -p "$old"
+  tar -xf "$old_tarball" -C "$old" --strip-components=3 "linux-$PIN_OLD_VERSION/sound/pci/hda"
+  # installer: copy patch_cirrus/Makefile and patch_cirrus_* into the tree, then
+  # patch_patch_cs8409.c.diff, then patch_patch_cs8409.h.diff (all -p2)
+  cp "$REPO_ROOT/patch_cirrus/Makefile" "$REPO_ROOT"/patch_cirrus/patch_cirrus_* "$old/hda"
+  patch --batch --no-backup-if-mismatch -p2 -d "$old/hda" < "$REPO_ROOT/patch_patch_cs8409.c.diff" >/dev/null 2>&1
+  patch --batch --no-backup-if-mismatch -p2 -d "$old/hda" < "$REPO_ROOT/patch_patch_cs8409.h.diff" >/dev/null 2>&1
+  assert_eq 0 "$?" "R4 patch_patch_cs8409.h.diff applies to the pinned $PIN_OLD_VERSION tree"
+  oldpatched="$old/hda/patch_cs8409.h"
+
+  assert_eq "" "$(enum_comment_mismatches "$oldpatched" cs8409_pins nid)" \
+    "R4 every cs8409_pins '// nid' comment equals the member's position"
+  assert_eq "" "$(enum_comment_mismatches "$oldpatched" cs8409_coefficient_index_registers reg)" \
+    "R4 every coefficient '// reg' comment equals the member's position"
+  assert_eq "" "$(enum_multi_comment_members "$oldpatched" cs8409_coefficient_index_registers)" \
+    "R5 no coefficient member carries two comments"
+  # control: the checker flags a member with two comments
+  sed 's|// reg 0x63|// reg 0x63 /* extra */|' "$oldpatched" > "$WORK/two.h"
+  assert_contains "$(enum_multi_comment_members "$WORK/two.h" cs8409_coefficient_index_registers)" "CS8409_PFE_COEF_W1" \
+    "R5 control: a member with two comments is reported"
+else
+  echo "note: pinned $PIN_OLD_VERSION tarball not cached; R4-R5 skipped"
+fi
 
 finish
