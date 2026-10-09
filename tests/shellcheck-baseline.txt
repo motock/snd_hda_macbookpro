@@ -24,7 +24,6 @@
 
 dkms.sh:SC2034
 dkms.sh:SC2164
-dkms.sh:SC2220
 install.cirrus.driver.pre617.sh:SC2034
 install.cirrus.driver.pre617.sh:SC2166
 install.cirrus.driver.sh:SC2034

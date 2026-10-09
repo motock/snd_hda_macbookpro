@@ -200,11 +200,29 @@ You will need to first install dkms on your system
 sudo ./install.cirrus.driver.sh -i
 ```
 
+**installer options**
+
+`install.cirrus.driver.sh` and `install.cirrus.driver.pre617.sh` accept:
+
+| Flag | Meaning |
+|---|---|
+| `-i`, `--install` | install via dkms (with `-d`/dkms.conf) |
+| `-r`, `--remove` / `-u`, `--uninstall` | remove the driver (the two are aliases) |
+| `-k`, `--kernel RELEASE` | kernel release to target (default: the positional `RELEASE`, else `uname -r`) |
+| `-d`, `--dkms` | internal, set by `dkms.conf` `PRE_BUILD` |
+
+`dkms.sh` accepts `-r`/`-u` (remove) and `-k RELEASE` (kernel to remove from, default `uname -r`).
+
+An unknown option, an option missing its argument (`-k` alone) or more than one positional
+argument prints a `usage:` line to stderr and exits with status **2**. Status 1 still means the
+install or removal itself failed.
+
 **remove driver from dkms**
 ```
 sudo ./install.cirrus.driver.sh -r
 ```
-This runs `dkms remove snd_hda_macbookpro/0.1` (the name and version from `dkms.conf`), which also
-restores any base kernel module dkms archived. The dkms module lives in
+This runs `dkms remove snd_hda_macbookpro/0.1 -k {kernel version}` (the name and version from `dkms.conf`),
+which also restores any base kernel module dkms archived. Only the targeted kernel (`-k`, else the
+positional release, else `uname -r`) is removed; other kernels keep their dkms build. The dkms module lives in
 `/lib/modules/{kernel version}/updates/dkms/`. Afterwards run `sudo depmod -a`.
 
