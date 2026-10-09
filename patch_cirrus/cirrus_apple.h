@@ -614,7 +614,7 @@ static void debug_show_configs(struct hda_codec *codec,
 			       struct auto_pin_cfg *cfg)
 {
 	struct hda_gen_spec *spec = codec->spec;
-	static const char * const lo_type[3] = { "LO", "SP", "HP" };
+	static const char * const __maybe_unused lo_type[3] = { "LO", "SP", "HP" };
 	int i;
 
         debug_badness("debug_show_configs start\n");
@@ -952,7 +952,6 @@ cs_8409_hda_jack_detect_enable_callback(struct hda_codec *codec, hda_nid_t nid, 
 {
 	struct hda_jack_tbl *jack;
 	struct hda_jack_callback *callback = NULL;
-	int err;
 
         myprintk("snd_hda_intel: cs_8409_hda_jack_detect_enable_callback nid 0x%02x dev_id %d tag 0x%02x\n", nid, dev_id, tag);
 
@@ -992,34 +991,6 @@ cs_8409_hda_jack_detect_enable_callback(struct hda_codec *codec, hda_nid_t nid, 
 	//if (err < 0)
 	//	return ERR_PTR(err);
 	return callback;
-}
-
-// this is a copy of local routine call_jack_callback from hda_jack.c
-static void cs_8409_apple_call_jack_callback(struct hda_codec *codec, unsigned int res,
-                                             struct hda_jack_tbl *jack)
-{
-        struct hda_jack_callback *cb;
-
-        for (cb = jack->callback; cb; cb = cb->next) {
-		cb->jack = jack;
-		cb->unsol_res = res;
-                cb->func(codec, cb);
-	}
-        if (jack->gated_jack) {
-                struct hda_jack_tbl *gated =
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0)
-                        snd_hda_jack_tbl_get_mst(codec, jack->gated_jack, jack->dev_id);
-#else
-                        snd_hda_jack_tbl_get(codec, jack->gated_jack);
-#endif
-                if (gated) {
-                        for (cb = gated->callback; cb; cb = cb->next) {
-				cb->jack = jack;
-				cb->unsol_res = res;
-                                cb->func(codec, cb);
-			}
-                }
-        }
 }
 
 
@@ -1154,25 +1125,6 @@ static void cs_8409_dump_auto_config(struct hda_codec *codec, const char *label_
 }
 
 
-static void cs_8409_dump_path(struct nid_path *path)
-{
-        int i;
-        int j;
-
-        myprintk("snd_hda_intel: dump path\n");
-
-        myprintk("snd_hda_intel: path %d: active %d pin_enabled %d pin_fixed %d stream_enabled %d\n", i, path->active, path->pin_enabled, path->pin_fixed, path->stream_enabled);
-        myprintk("snd_hda_intel:     path %d: depth %d\n", i, path->depth);
-        for(j=0; j < path->depth; j++) {
-                        myprintk("snd_hda_intel:     path %d: path nid 0x%02x idx %d multi %d\n", j, path->path[j], path->idx[j], path->multi[j]);
-        }
-        for(j=0; j < NID_PATH_NUM_CTLS; j++) {
-                        myprintk("snd_hda_intel:     ctl %d: path 0x%08x\n", j, path->ctls[j]);
-        }
-
-        myprintk("snd_hda_intel: dump path end\n");
-}
-
 
 // so now think multi in the path is different from multiout
 // - now think its about if there are multiple connections as listed by AC_VERB_GET_CONNECT_LIST
@@ -1216,7 +1168,6 @@ static int cs_8409_apple_boot_init(struct hda_codec *codec)
 	struct cs8409_apple_spec *spec = NULL;
 	//struct snd_kcontrol *kctl = NULL;
 	int pcmcnt = 0;
-	int ret_unsol_enable = 0;
 
 	// so apparently if we do not define a resume function
 	// then this init function will be called on resume
@@ -1372,12 +1323,7 @@ static int cs_8409_apple_boot_init(struct hda_codec *codec)
 
 static int cs_8409_apple_init(struct hda_codec *codec)
 {
-	struct hda_pcm *info = NULL;
-	struct hda_pcm_stream *hinfo = NULL;
-	struct cs8409_apple_spec *spec = NULL;
 	//struct snd_kcontrol *kctl = NULL;
-	int pcmcnt = 0;
-	int ret_unsol_enable = 0;
 
 	// not sure what the init function is supposed to be doing
 	// its called in snd_hda_codec_build_controls
@@ -1530,7 +1476,6 @@ int cs_8409_apple_build_pcms(struct hda_codec *codec)
 
 
         list_for_each_entry(pcm, &codec->pcm_list_head, list) {
-                struct snd_pcm_chmap *chmap;
                 //const struct snd_pcm_chmap_elem *elem;
 		if (pcm != NULL) {
 			myprintk("snd_hda_intel: cs_8409_apple_build_pcms name %s\n", pcm->name);
@@ -1655,7 +1600,6 @@ static void cs_8409_cs42l83_unsol_event_handler(struct hda_codec *codec, unsigne
 
 void cs_8409_cs42l83_jack_unsol_event(struct hda_codec *codec, unsigned int res)
 {
-        struct hda_jack_tbl *event;
         //int ret_unsol_enable = 0;
         //int tag = (res >> AC_UNSOL_RES_TAG_SHIFT) & 0x7f;
         int tag = (res & AC_UNSOL_RES_TAG) >> AC_UNSOL_RES_TAG_SHIFT;
@@ -1805,11 +1749,11 @@ static const struct hda_codec_ops cs_8409_apple_ops = {
 //      this includes enabling/disabling whether we see a Headphone entry in the settings sound dialog
 
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 13, 0) || TESTING
 static int cs_8409_apple_create_input_ctls_old(struct hda_codec *codec);
+#endif
 
 static int cs_8409_apple_create_input_ctls(struct hda_codec *codec);
-
-static void cs_8409_cs42l83_callback(struct hda_codec *codec, struct hda_jack_callback *event);
 
 
 static int cs_8409_apple_parse_auto_config(struct hda_codec *codec)
@@ -2173,12 +2117,7 @@ static int cs_8409_apple_create_input_ctls_old(struct hda_codec *codec)
 static int cs_8409_apple_create_input_ctls(struct hda_codec *codec)
 {
 	struct hda_gen_spec *spec = codec->spec;
-	const struct auto_pin_cfg *cfg = &spec->autocfg;
-	hda_nid_t mixer = spec->mixer_nid;
 	struct hda_input_mux *imux = &spec->input_mux;
-	int num_adcs = 0;
-	int err;
-	unsigned int val;
 	int i, n, nums;
 
 	myprintk("snd_hda_intel: cs_8409_apple_create_input_ctls\n");
@@ -2229,6 +2168,7 @@ static int cs_8409_apple_create_input_ctls(struct hda_codec *codec)
 	return 0;
 }
 
+#ifdef APPLE_FIXUPS
 /* do I need this for 8409 - I certainly need some gpio patching */
 static void cs_8409_apple_fixup_gpio(struct hda_codec *codec,
                                      const struct hda_fixup *fix, int action)
@@ -2271,6 +2211,7 @@ static void cs_8409_apple_fixup_gpio(struct hda_codec *codec,
        }
        myprintk("snd_hda_intel: end cs_8409_apple_fixup_gpio\n");
 }
+#endif
 
 
 // this is from a previous 8409 fixup - remove when see what need to be replaced by
@@ -2352,25 +2293,9 @@ static const struct hda_pintbl imac_pincfgs[] = {
 
 static void cs_8409_cs42l83_unsolicited_response(struct hda_codec *codec, unsigned int res);
 
-static void cs_8409_cs42l83_callback(struct hda_codec *codec, struct hda_jack_callback *event)
-{
-        struct cs8409_apple_spec *spec = codec->spec;
-
-        mycodec_info(codec, "cs_8409_cs42l83_callback %pF\n", cs_8409_cs42l83_callback);
-
-	// for kernel version 4 we stored the unsol res data in private_data
-	// - now its a separate entity
-        ////cs_8409_cs42l83_unsol_event_handler(codec, event->private_data);
-
-        cs_8409_cs42l83_unsol_event_handler(codec, event->unsol_res);
-
-        mycodec_info(codec, "cs_8409_cs42l83_callback end\n");
-}
-
 
 static void cs_8409_cs42l83_unsol_event_handler(struct hda_codec *codec, unsigned int unsol_res)
 {
-	struct cs8409_apple_spec *spec = codec->spec;
 
 	mycodec_info(codec, "cs_8409_cs42l83_unsol_event_handler\n");
 
@@ -2400,7 +2325,6 @@ static void cs_8409_cs42l83_unsol_event_handler(struct hda_codec *codec, unsigne
 
 static void cs_8409_automute(struct hda_codec *codec)
 {
-	struct cs8409_apple_spec *spec = codec->spec;
 	dev_info(hda_codec_dev(codec), "cs_8409_automute called\n");
 }
 
@@ -2419,6 +2343,9 @@ static void cs_8409_capture_pcm_hook(struct hda_pcm_stream *hinfo,
 
 
 // for Apple we need multiple versions because so far macbook pro and imacs use different nids
+/* the only caller is commented out in cs8409_apple(); kept for the iMac/MacBook split */
+static int cs8409_cs42l83_macbook_exec_verb(struct hdac_device *dev, unsigned int cmd, unsigned int flags,
+                                       unsigned int *res) __maybe_unused;
 static int cs8409_cs42l83_macbook_exec_verb(struct hdac_device *dev, unsigned int cmd, unsigned int flags,
                                             unsigned int *res)
 {
@@ -2465,6 +2392,9 @@ static int cs8409_cs42l83_macbook_exec_verb(struct hdac_device *dev, unsigned in
         return spec->exec_verb(dev, cmd, flags, res);
 }
 
+/* the only caller is commented out in cs8409_apple(); kept for the iMac/MacBook split */
+static int cs8409_cs42l83_imac_exec_verb(struct hdac_device *dev, unsigned int cmd, unsigned int flags,
+                                       unsigned int *res) __maybe_unused;
 static int cs8409_cs42l83_imac_exec_verb(struct hdac_device *dev, unsigned int cmd, unsigned int flags,
                                          unsigned int *res)
 {
@@ -2517,9 +2447,6 @@ static int cs8409_cs42l83_exec_verb(struct hdac_device *dev, unsigned int cmd, u
         struct hda_codec *codec = container_of(dev, struct hda_codec, core);
         struct cs8409_apple_spec *spec = codec->spec;
         //struct cs8409_spec *spec = codec->spec;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 13, 0)
-        struct sub_codec *cs42l83 = spec->scodecs[CS8409_CODEC0];
-#endif
 
         unsigned int nid = ((cmd >> 20) & 0x07f);
         unsigned int verb = ((cmd >> 8) & 0x0fff);
@@ -2595,9 +2522,7 @@ static int cs8409_apple(struct hda_codec *codec)
         struct cs8409_apple_spec *spec;
         int err;
         int itm;
-        int i;
         //hda_nid_t *dac_nids_ptr = NULL;
-        const struct hda_pincfg *pin;
         int fixup_found = 0;
 
         //struct hda_pcm *info = NULL;
@@ -3162,6 +3087,7 @@ static int cs8409_apple(struct hda_codec *codec)
 // a specific code
 // has to be here to use functions defined in patch_cirrus_new84.h
 
+#ifdef ADD_EXTENDED_VERB
 static unsigned int
 cs_8409_extended_codec_verb(struct hda_codec *codec, hda_nid_t nid,
                                 int flags,
@@ -3208,7 +3134,6 @@ cs_8409_extended_codec_verb(struct hda_codec *codec, hda_nid_t nid,
 	return retval;
 }
 
-#ifdef ADD_EXTENDED_VERB
 static void cs_8409_set_extended_codec_verb(void)
 {
 	snd_hda_set_extended_codec_verb(cs_8409_extended_codec_verb);
