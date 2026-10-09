@@ -96,4 +96,23 @@ $MODPOST" 2 "$OBJ")" "an unexpected modpost error fails"
 : > "$SCRATCH/empty.o"
 assert_eq 1 "$(verdict "  CC [M]  cs8409.o" 0 "$SCRATCH/empty.o")" "an empty cs8409.o fails"
 
+SYMVERS_MISSING='WARNING: /tmp/ci-build-check.AbC123/linux/Module.symvers is missing.'
+SUPPRESSED='WARNING: modpost: suppressed 67 unresolved symbol warnings because there were too many)'
+assert_eq 0 "$(verdict "$SYMVERS_MISSING
+$MODPOST
+$SUPPRESSED
+make[2]: *** [Makefile:1961: modpost] Error 2" 2 "$OBJ")" \
+  "the Module.symvers-missing and suppressed-N modpost lines pass"
+assert_eq 1 "$(verdict "$SYMVERS_MISSING
+$MODPOST
+$SUPPRESSED
+ERROR: something else" 2 "$OBJ")" "an unrelated ERROR beside the accepted modpost lines fails"
+assert_eq 1 "$(verdict "$SYMVERS_MISSING
+$MODPOST
+$SUPPRESSED
+WARNING: something else" 2 "$OBJ")" "an unrelated WARNING beside the accepted modpost lines fails"
+printf '%s\n%s\nWARNING: something else\n' "$MODPOST" "$SUPPRESSED" > "$SCRATCH/log"
+assert_contains "$(ci_build_verdict "$SCRATCH/log" 2 "$OBJ" 2>&1)" "1 unexpected ERROR/WARNING" \
+  "the unexpected line count is named"
+
 finish
