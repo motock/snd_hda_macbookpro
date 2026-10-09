@@ -2417,35 +2417,6 @@ static void cs_8409_capture_pcm_hook(struct hda_pcm_stream *hinfo,
                                      struct snd_pcm_substream *substream,
                                      int action);
 
-// new attempt if we decide to use the existing fixup mechanism to handle setup
-
-#ifdef APPLE_FIXUPS
-static int cs8409_apple_nouse(struct hda_codec *codec)
-{
-	struct cs8409_apple_spec *spec = codec->spec;
-	//struct cs8409_spec *spec = codec->spec;
-        int err;
-        int itm;
-
-        snd_hda_pick_fixup(codec, cs8409_apple_models, cs8409_apple_fixup_tbl, cs8409_apple_fixups);
-
-        mycodec_dbg(codec, "Picked ID=%d, VID=%08x, DEV=%08x\n", codec->fixup_id,
-                         codec->bus->pci->subsystem_vendor,
-                         codec->bus->pci->subsystem_device);
-
-        snd_hda_apply_fixup(codec, HDA_FIXUP_ACT_PRE_PROBE);
-
-        err = cs8409_apple_parse_auto_config(codec);
-        if (err < 0) {
-                cs8409_remove(codec);
-                return err;
-        }
-
-        snd_hda_apply_fixup(codec, HDA_FIXUP_ACT_PROBE);
-        return 0;
-}
-#endif
-
 
 // for Apple we need multiple versions because so far macbook pro and imacs use different nids
 static int cs8409_cs42l83_macbook_exec_verb(struct hdac_device *dev, unsigned int cmd, unsigned int flags,

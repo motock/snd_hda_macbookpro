@@ -470,15 +470,6 @@ static unsigned int cs_8409_vendor_i2cWriteMask(struct hda_codec *codec, unsigne
 }
 
 
-// this seems to be how to do a list of verbs
-// there is command to do a sequence of these
-// snd_hda_sequence_write
-static const struct hda_verb cs8409_init_verbs[] = {
-        //{0x01, AC_VERB_SET_POWER_STATE, 0x00}, /* AFG: D0 */
-        //{0x24, AC_VERB_SET_PROC_STATE, 0x01},  /* VPW: processing on */
-        {} /* terminator */
-};
-
 struct hda_coef {
         u16 write;
         hda_nid_t nid;
@@ -486,16 +477,6 @@ struct hda_coef {
         u32 param;
         u32 retdata;
         int srcidx;
-};
-
-// new feature to do a sequence of coef read/writes
-// (seems to be used a lot for cs8409)
-// note that we ignore the return for gets for the moment!!
-// ooh - new idea - save the logged return and check
-static const struct hda_coef cs8409_init_coef[] = {
-        //{0, 0x01, idx, 0x00, retdata, 0}, read
-        //{1, 0x01, idx, param, dmydata, 0}, write
-        //{2, 0x01, idx, param, retdata, 0}, write mask
 };
 
 
@@ -630,19 +611,6 @@ static void clear_pins(struct hda_codec *codec)
 	mycodec_info(codec, "end   clear_pins\n");
 }
 
-
-static void read_coefs_all_loop(struct hda_codec *codec)
-{
-	//struct cs8409_apple_spec *spec = codec->spec;
-	int idx;
-	mycodec_info(codec, "start read_coefs_all\n");
-	for (idx = 0; idx < 130; idx++)
-		{
-		int retval = cs_8409_vendor_coef_get(codec, idx);
-		mycodec_info(codec,"snd_hda_intel: read_coefs_all 0x%02x:  0x%08x\n",idx,retval);
-		}
-	mycodec_info(codec, "end   read_coefs_all\n");
-}
 
 // this is very hacky but until get more understanding of what we can do with the 8409 setup
 // re-define these from hda_codec.c here
@@ -1448,17 +1416,6 @@ static void cs_8409_cs42l83_unsolicited_response_finalize(struct hda_codec *code
 		//cs_8409_external_device_unsolicited_response_data(codec, res);
 		cs_8409_external_device_unsolicited_response(codec, 0, 1);
 	}
-}
-
-
-static void cs_8409_headset_mike_setup_nouse(struct hda_codec *codec)
-{
-        struct cs8409_apple_spec *spec = codec->spec;
-
-        cs_8409_intmike_linein_disable(codec);
-
-	cs_8409_headset_mike_streaming_preplay(codec, 1);
-	cs_8409_headset_mike_buttons_enable(codec);
 }
 
 
