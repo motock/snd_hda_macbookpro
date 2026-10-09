@@ -2479,6 +2479,7 @@ static int cs8409_cs42l83_macbook_exec_verb(struct hdac_device *dev, unsigned in
                         *res = (cs42l83->mic_jack_in) ? AC_PINSENSE_PRESENCE : 0;
                         return 0;
                 }
+                break;
         case CS8409_CS42L83_MACBOOK_LINEIN_PIN_NID:
                 if (verb == AC_VERB_GET_PIN_SENSE) {
                         *res = (cs42l83->linein_jack_in) ? AC_PINSENSE_PRESENCE : 0;
@@ -2577,7 +2578,7 @@ static int cs8409_cs42l83_exec_verb(struct hdac_device *dev, unsigned int cmd, u
                         *res = (spec->jack_present) ? AC_PINSENSE_PRESENCE : 0;
                         return 0;
                 }
-        } else if (nid == spec->linein_nid) {
+        } else if (spec->linein_nid != 0 && nid == spec->linein_nid) {
                 //myprintk("snd_hda_intel: cs 8409 exec verb 0x%04x 0x%x\n", nid, verb);
                 if (verb == AC_VERB_GET_PIN_SENSE) {
                         //myprintk("snd_hda_intel: cs 8409 exec verb pin sense 0x%04x %d\n", nid, cs42l83->linein_jack_in);
