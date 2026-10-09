@@ -13,6 +13,17 @@ hda_dir="$build_dir/hda"
 # Storing the script arguments before processing them if needed for pre617 script
 script_arguments_pre617=("$@")
 
+# Bad invocation: usage to stderr, exit 2 (exit 1 is reserved for a failed install)
+usage() {
+    echo "usage: $0 [-i|--install | -r|--remove | -u|--uninstall] [-k|--kernel RELEASE] [-d|--dkms] [RELEASE]" >&2
+    echo "  -i, --install    install the driver (the default)" >&2
+    echo "  -r, --remove     remove the driver (alias of -u)" >&2
+    echo "  -u, --uninstall  remove the driver (alias of -r)" >&2
+    echo "  -k, --kernel     kernel release to target (default: RELEASE, else uname -r)" >&2
+    echo "  -d, --dkms       internal: set by dkms.conf PRE_BUILD" >&2
+    exit 2
+}
+
 # Initialize empty variable to store the -k flag input safely
 TARGET_UNAME=""
 
@@ -20,15 +31,17 @@ while [ $# -gt 0 ]
 do
     case $1 in
     -i|--install) dkms_action='install';;
-    -k|--kernel) TARGET_UNAME=$2; [[ -z $TARGET_UNAME ]] && echo '-k|--kernel must be followed by a kernel version' && exit 1; shift;;
+    -k|--kernel) TARGET_UNAME=${2:-}; [[ -z $TARGET_UNAME ]] && echo '-k|--kernel must be followed by a kernel version' >&2 && usage; shift;;
     -r|--remove) dkms_action='remove';;
     -u|--uninstall) dkms_action='remove';;
     -d|--dkms) dkms=true;;
-    (-*) echo "$0: error - unrecognized option $1" 1>&2; exit 1;;
+    (-*) echo "$0: error - unrecognized option $1" 1>&2; usage;;
     (*) break;;
     esac
     shift
 done
+
+[[ $# -gt 1 ]] && usage
 
 # Set UNAME prioritizing -k flag, then positional argument $1, and finally falling back to uname -r
 UNAME=${TARGET_UNAME:-${1:-$(uname -r)}}
@@ -121,7 +134,7 @@ elif [[ $dkms_action == 'remove' ]]; then
     # we MUST call dkms remove to ensure any archived base kernel module is restored
     # and it also removes the whole dkms module subtree
     rc=0
-    bash dkms.sh -r || rc=$?
+    bash dkms.sh -r -k "$UNAME" || rc=$?
     if [[ $rc -ne 0 ]]; then
         echo "dkms remove failed (exit $rc)" >&2
     fi

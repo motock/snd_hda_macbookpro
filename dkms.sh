@@ -6,21 +6,38 @@ dkms_name='snd_hda_macbookpro/0.1'
 var_dkms_dir='/var/lib/dkms/snd_hda_macbookpro'
 cur_dir=$(cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd)
 
+usage() {
+    echo "usage: $0 [-r | -u] [-k KERNEL_RELEASE]" >&2
+    echo "  -r  remove the dkms module (restores the original kernel module)" >&2
+    echo "  -u  same as -r" >&2
+    echo "  -k  kernel release to remove it from (default: uname -r); only with -r/-u" >&2
+    echo "  no option: install the dkms module" >&2
+    exit 2
+}
+
+kernel=""
+
 # specify uninstall with the -r or -u argument
-while getopts :ru arg
+while getopts :ruk: arg
 do
     case "${arg}" in
         r) dkms_remove=true;;
         u) dkms_remove=true;;
+        k) kernel=$OPTARG;;
+        \?|:) usage;;
     esac
 done
+shift $((OPTIND-1))
+[[ $# -eq 0 ]] || usage
 
 if [[ $dkms_remove = true ]]; then
 
     # we need this to ensure the original kernel module is restored
     # before we remove the whole /var/lib/dkms/snd_hda_macbookpro directory tree below
     # (which we dont need to do if we do the dkms remove)
-    dkms remove "$dkms_name"
+    # remove only the kernel the installer targets; --all would also strip
+    # the module from every other kernel that has it built
+    dkms remove "$dkms_name" -k "${kernel:-$(uname -r)}"
     rc=$?
     if [[ $rc -ne 0 ]]; then
         echo "dkms remove failed for $dkms_name (exit $rc)" >&2
