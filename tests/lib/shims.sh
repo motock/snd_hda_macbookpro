@@ -192,7 +192,7 @@ hda_shim_rc_clear() {
 # hda_sandbox_setup -- print the path of a throwaway copy of the repository.
 # The installers mutate dkms.conf, create build/ and write under /lib/modules,
 # so they must never run in the real tree.  The copy is the checkout minus
-# .git (a file in a worktree, and useless here), tests/ (31 MB of WAV fixtures)
+# .git (a file in a worktree, and useless here), tests/ (bulky and unneeded)
 # and build/ (a previous run's leftovers); that is ~1 MB and keeps the sandbox
 # faithful for every code path, including the ones this machine cannot reach
 # today.  Dotfiles are skipped too: no installer reads one.
