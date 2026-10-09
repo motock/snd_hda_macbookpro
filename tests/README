@@ -564,3 +564,12 @@ bash tests/test_shell_static.sh   # 0 pass, 1 fail, 77 skip
 
 It never exits 77: the shellcheck part degrades to a note instead of skipping
 the whole file, so `bash -n` coverage is never lost.
+
+## Faking the distribution: `HDA_OS_RELEASE`
+
+Both installers read `${HDA_OS_RELEASE:-/etc/os-release}` to decide whether the
+host is Ubuntu (and so should use the `linux-source` package). Set
+`HDA_OS_RELEASE` to a fixture file to drive either path on any host; leave it
+unset in normal use. A missing or unreadable file behaves like an absent
+`/etc/os-release`: `grep` complains on stderr and the host is treated as
+non-Ubuntu. Covered by `tests/test_installer_os_release.sh`.
