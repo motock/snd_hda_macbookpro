@@ -1,0 +1,74 @@
+name: build
+
+# Compiles cs8409.o against the pinned kernels (tests/kernel-pins.conf) with
+# lib/ci_build_check.sh; any compiler warning or error fails the leg.
+#
+# Out of scope: the pre-6.17 installer path (install.cirrus.driver.pre617.sh)
+# and kernels beyond the pins (6.17.13 = "new", 7.1.13 = "7x").
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+# One run per ref. Only PR runs are cancelled by a newer push; master pushes
+# always run to completion.
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    name: build (${{ matrix.pin }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    container:
+      image: ubuntu:24.04@sha256:534baea6a22c03a63003dbc8dbe78fe34bc0d7e595d9a9dc9834884ff530eb55
+    strategy:
+      fail-fast: false
+      matrix:
+        pin: [new, 7x]
+    env:
+      HDA_TEST_CACHE: /var/cache/snd_hda_macbookpro-tests
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # A miss only costs time: ci_build_check.sh downloads and verifies the
+      # tarball. The pin is part of the key because both legs share one cache
+      # path but each only fetches its own tarball; with a shared key only
+      # the first leg to finish would ever save.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ env.HDA_TEST_CACHE }}
+          key: kernel-tarballs-${{ hashFiles('tests/kernel-pins.conf') }}-${{ matrix.pin }}
+
+      - name: Install build tools
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            build-essential bc bison flex libssl-dev libelf-dev \
+            libncurses-dev xz-utils patch curl ca-certificates python3
+
+      - name: Build cs8409.o on the pinned kernel
+        run: bash lib/ci_build_check.sh ${{ matrix.pin }}
+
+  # Single stable check name for branch protection: fails unless every
+  # matrix leg succeeded (a skipped or cancelled leg is not a pass).
+  build-ok:
+    name: build-ok
+    needs: build
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require every build leg to succeed
+        env:
+          BUILD_RESULT: ${{ needs.build.result }}
+        run: |
+          echo "build matrix result: ${BUILD_RESULT}"
+          [ "${BUILD_RESULT}" = success ]
