@@ -16,10 +16,12 @@ concurrency:
 
 env:
   # Pinned: tests/shellcheck-baseline.txt is a ratchet against this version.
-  # The release publishes no checksum file; the SHA-256 was computed from the
-  # downloaded tarball and matches the digest GitHub reports for the asset.
-  SHELLCHECK_VERSION: "0.11.0"
-  SHELLCHECK_SHA256: "8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198"
+  # Upstream publishes no checksum file or asset digest for v0.10.0 (checked
+  # 2026-10-09 via the releases API). The SHA-256 was computed from the
+  # shellcheck-v0.10.0.linux.x86_64.tar.xz release asset downloaded twice
+  # independently (gh release download and curl, identical digests).
+  SHELLCHECK_VERSION: "0.10.0"
+  SHELLCHECK_SHA256: "6c881ab0698e4e6ea235245f22832860544f17ba386442fe7e9d629f8cbedf87"
 
 jobs:
   tests:
