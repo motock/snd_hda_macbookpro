@@ -216,7 +216,7 @@ whether audio works.
 bash tests/run.sh | tee run.out; bash tests/ci/gate.sh run.out
 ```
 
-Needs bash, GNU patch, xz, gcc, curl and a SHA-256 tool; ShellCheck 0.11.0 for the static-analysis
+Needs bash, GNU patch, xz, gcc, curl and a SHA-256 tool; ShellCheck 0.10.0 for the static-analysis
 tests (without it the baseline comparison is skipped with a note, so a clean local run does not
 prove the ShellCheck step passes in CI). The suite downloads and
 SHA-256-verifies the pinned kernel tarballs on first use; set `HDA_TEST_CACHE` to choose where
@@ -246,8 +246,8 @@ add its name to `matrix.pin` in `build.yml` and teach `lib/ci_build_check.sh` an
 
 The version and SHA-256 are the `SHELLCHECK_VERSION` and `SHELLCHECK_SHA256` entries in the `env:`
 block of `.github/workflows/tests.yml`. The release publishes no checksum file, so download the
-`shellcheck-v<version>.linux.x86_64.tar.xz` asset and compute `sha256sum` yourself (it should match
-the digest GitHub shows for the asset). Then run the suite with the new version: new findings must
+`shellcheck-v<version>.linux.x86_64.tar.xz` asset and hash it twice from independent downloads and
+require both digests to agree (and match the digest GitHub shows for the asset, when one exists). Then run the suite with the new version: new findings must
 be fixed, not added to the baseline.
 
 `tests/shellcheck-baseline.txt` lists accepted findings and is a ratchet: it may only shrink.
