@@ -124,21 +124,37 @@ The rest of this directory is manual test material for real hardware.
 
 Test waveforms for speakers
 
-StereoTest32_reduced_m24dB.wav is reduced volume level for testing via the direct hardware device
+The WAV fixtures are no longer stored in git. Generate them (needs `sox` or
+`ffmpeg`):
 
-Run:
+```sh
+tests/gen-test-audio.sh            # writes to ${TMPDIR:-/tmp}/hda-test-audio
+tests/gen-test-audio.sh /some/dir  # or to a directory of your choice
+```
 
+The script prints the paths it wrote. Both files are 10 s, 440 Hz sine,
+44100 Hz, 4 channels, 32-bit PCM (the format of the original fixtures):
+
+* `StereoTest32.wav` -- full volume.
+* `StereoTest32_reduced_m24dB.wav` -- reduced volume level (-24 dB) for testing
+  via the direct hardware device.
+
+Run (from the output directory):
+
+```sh
 aplay StereoTest32.wav
+```
 
 or
 
+```sh
 aplay -D hw:0,0 StereoTest32_reduced_m24dB.wav
-
+```
 
 NOTA BENE - do NOT use -D hw:0,0 with StereoTest32.wav
 
-
-waveform provided by milan475
+The original waveform was provided by milan475; the generated files are
+synthetic equivalents, not byte-identical copies.
 
 ### Codec re-probe (WARN_ON in `hda_codec_driver_probe`)
 
@@ -434,7 +450,7 @@ Run this on a MacBook with the CS8409/CS42L83 codec, on a kernel built with
 ./install.cirrus.driver.sh
 
 # 2. start playback and leave it running
-aplay -D plughw:CARD=CS8409,DEV=0 tests/StereoTest32.wav &
+aplay -D plughw:CARD=CS8409,DEV=0 "$(tests/gen-test-audio.sh | head -n 1)" &
 
 # 3. hot-plug the jack repeatedly while playback runs, so unsolicited
 #    responses are enqueued from the work item while the PCM hooks drain

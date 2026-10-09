@@ -10,3 +10,5 @@ modules.order
 # patch(1) leftovers (patch -b writes .orig, failed hunks write .rej)
 *.rej
 *.orig
+# generated test audio (see tests/gen-test-audio.sh)
+tests/*.wav
