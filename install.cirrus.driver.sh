@@ -197,14 +197,17 @@ if [ $isfedora -ge 1 ]; then
 fi
 
 isubuntu=0
+# HDA_OS_RELEASE overrides the os-release file read below; it exists so tests can
+# fake a distribution. Leave it unset in normal use (defaults to /etc/os-release).
+os_release=${HDA_OS_RELEASE:-/etc/os-release}
 # Check if we are dealing with Ubuntu
-if [ "$(grep '^NAME=' /etc/os-release | grep -c Ubuntu)" -eq 1 ]; then
+if [ "$(grep '^NAME=' "$os_release" | grep -c Ubuntu)" -eq 1 ]; then
         isubuntu=1
 # For Unbuntu based distributions like Mint, ubuntu will be mentionned in ID_LIKE
-elif [ "$(grep '^ID_LIKE=' /etc/os-release | grep -c "ubuntu")" -eq 1 ]; then
+elif [ "$(grep '^ID_LIKE=' "$os_release" | grep -c "ubuntu")" -eq 1 ]; then
         isubuntu=1
 # In some other Unbuntu based distributions like Pop OS, we need to check ID
-elif [ "$(grep '^ID=' /etc/os-release | grep -c "ubuntu")" -eq 1 ]; then
+elif [ "$(grep '^ID=' "$os_release" | grep -c "ubuntu")" -eq 1 ]; then
         isubuntu=1
 fi
 
