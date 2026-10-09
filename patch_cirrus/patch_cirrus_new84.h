@@ -121,23 +121,6 @@ static unsigned int hda_set_node_power_state(struct hda_codec *codec, hda_nid_t 
         return hda_set_node_power_state_dbg(codec, nid, power_state, 0);
 }
 
-static unsigned int hda_set_node_power_state_simple(struct hda_codec *codec, hda_nid_t nid, unsigned int power_state)
-{
-        unsigned int state = power_state;
-	//unsigned int current_state;
-	mycodec_info(codec, "hda_set_node_power_state_simple     power %d\n",power_state);
-        state = snd_hda_codec_read(codec, nid, 0, AC_VERB_GET_POWER_STATE, 0);
-        if (!(state & AC_PWRST_ERROR)) {
-	        if (state != power_state) {
-                        snd_hda_codec_write(codec, nid, 0, AC_VERB_SET_POWER_STATE, power_state);
-	                state = hda_sync_power_state_8409(codec, nid, power_state);
-	        }
-	}
-	mycodec_info(codec, "hda_set_node_power_state_simple end power %d\n",state);
-
-        return state;
-}
-
 
 static void hda_check_power_state(struct hda_codec *codec, hda_nid_t nid, int flagint)
 {
@@ -152,7 +135,6 @@ static void hda_check_power_state(struct hda_codec *codec, hda_nid_t nid, int fl
 
 static inline unsigned int cs_8409_vendor_coef_get(struct hda_codec *codec, unsigned int idx)
 {
-        struct cs8409_apple_spec *spec = codec->spec;
         unsigned int retval;
         snd_hda_codec_read(codec, CS8409_VENDOR_NID, 0,
                             AC_VERB_GET_COEF_INDEX, 0);
@@ -168,7 +150,6 @@ static inline unsigned int cs_8409_vendor_coef_get(struct hda_codec *codec, unsi
 static inline void cs_8409_vendor_coef_set(struct hda_codec *codec, unsigned int idx,
                                       unsigned int coef)
 {
-        struct cs8409_apple_spec *spec = codec->spec;
         snd_hda_codec_read(codec, CS8409_VENDOR_NID, 0,
                             AC_VERB_GET_COEF_INDEX, 0);
         snd_hda_codec_write(codec, CS8409_VENDOR_NID, 0,
@@ -192,7 +173,6 @@ static inline unsigned int cs_8409_vendor_coef_set_mask(struct hda_codec *codec,
                                       unsigned int coef, unsigned int mask, unsigned int srcval, int srcidx)
 {
         // for the moment hackily add srcidx argument while debugging
-        struct cs8409_apple_spec *spec = codec->spec;
         unsigned int retval;
         unsigned int mask_coef;
         snd_hda_codec_read(codec, CS8409_VENDOR_NID, 0,
@@ -596,21 +576,6 @@ void snd_hda_double_reset(struct hda_codec *codec)
 }
 
 
-static void clear_pins(struct hda_codec *codec)
-{
-	//struct cs8409_apple_spec *spec = codec->spec;
-        hda_nid_t nid;
-
-	mycodec_info(codec, "start clear_pins\n");
-
-        for_each_hda_codec_node(nid, codec)
-                if (get_wcaps_type(get_wcaps(codec, nid)) == AC_WID_PIN) {
-                	/* use read here for syncing after issuing each verb */
-                	snd_hda_codec_read(codec, nid, 0, AC_VERB_SET_PIN_WIDGET_CONTROL, 0);
-                }
-	mycodec_info(codec, "end   clear_pins\n");
-}
-
 
 // this is very hacky but until get more understanding of what we can do with the 8409 setup
 // re-define these from hda_codec.c here
@@ -699,50 +664,6 @@ static void cs_8409_dump_stream_format(struct hda_codec *codec, hda_nid_t nid)
                 { mycodec_dbg(codec, "cs_8409_dump_stream_format: NID=0x%x, codec cached values: NULL\n", nid); }
 }
 
-static void cs_8409_reset_stream_format(struct hda_codec *codec, hda_nid_t nid, int format, int doreset)
-{
-        // note that this routine is currently not used
-
-        // this resets the cached stream format so that next
-        // stream setup will actually rewrite the stream format and stream id
-        // or if doreset set it will perform the stream update now
-        // also allow for only updating the stream format and not stream id
-
-        // NOTE we now save the stream format in our local cache as the hda_codec cache
-        //      is cleared at end of the prepare stage and we want to store it more permanently
-        //      really only the stream id is variable
-
-        struct hda_cvt_setup *p = NULL;
-        struct hda_cvt_setup_apple *papl = NULL;
-        u32 stream_tag_sv;
-        int channel_id_sv;
-        int format_id_sv;
-
-        // problem - the get_hda_cvt_setup function is local to hda_codec - so need our own copy above
-
-        papl = get_hda_cvt_setup_apple_8409(codec, nid);
-
-        stream_tag_sv = papl->stream_tag;
-        channel_id_sv = papl->channel_id;
-        format_id_sv = papl->format_id;
-
-	mycodec_info(codec, "cs_8409_reset_stream_format RESET for nid 0x%02x: 0x%08x id 0x%08x chan 0x%08x\n", nid, format_id_sv, stream_tag_sv, channel_id_sv);
-
-        // snd_hda_codec_setup_stream uses a caching system so only sends verbs when a change occurs
-        // we want to force a send here so need to clear the cached data
-
-        p = get_hda_cvt_setup_8409(codec, nid);
-
-        p->stream_tag = 0;
-        p->channel_id = 0;
-	if (format)
-                p->format_id = 0;
-
-        if (doreset)
-                snd_hda_codec_setup_stream(codec, nid, stream_tag_sv, channel_id_sv, format_id_sv);
-
-}
-
 // so what do I want this to do
 // the stream format will be stored in the hda_cvt_setup (at what stage is this valid??)
 // - we want to remove the Apple specific stream format/channel setup
@@ -767,9 +688,6 @@ static void cs_8409_reset_stream_format(struct hda_codec *codec, hda_nid_t nid, 
 static void cs_8409_save_and_clear_stream_format(struct hda_codec *codec, hda_nid_t nid, struct hda_cvt_setup *savep)
 {
         struct hda_cvt_setup *p = NULL;
-        u32 stream_tag_sv;
-        int channel_id_sv;
-        int format_id_sv;
 
         mycodec_dbg(codec, "cs_8409_save_and_clear_stream_format nid 0x%02x\n", nid);
 
@@ -958,10 +876,10 @@ static void switch_input_src(struct hda_codec *codec)
 	                path = snd_hda_get_path_from_idx(codec, spec->input_paths[i][c]);
 			if (path) {
 				int in;
-				bool active = path->active;
+				bool __maybe_unused active = path->active;
 				mycodec_dbg(codec, "switch_input_src path active %d\n",active);
 				for (in = path->depth - 1; in >= 0; in--) {
-					hda_nid_t tnid = path->path[in];
+					hda_nid_t __maybe_unused tnid = path->path[in];
 					mycodec_dbg(codec, "switch_input_src path nid %d: 0x%02x\n",in,tnid);
 				}
 				if (path->active) {
@@ -1260,33 +1178,6 @@ static bool cs_8409_unsol_pending(struct cs8409_apple_spec *spec)
 }
 
 // routine to clear unsol list
-static void cs_8409_clear_external_device_unsolicited_responses(struct hda_codec *codec)
-{
-	struct cs8409_apple_spec *spec = codec->spec;
-	struct unsol_item *unsol_entry = NULL;
-	struct unsol_item *unsol_temp = NULL;
-	LIST_HEAD(pending);
-	unsigned long flags;
-
-	spin_lock_irqsave(&spec->unsol_lock, flags);
-	list_splice_init(&spec->unsol_list, &pending);
-	spin_unlock_irqrestore(&spec->unsol_lock, flags);
-
-	if (!list_empty(&pending)) {
-		codec_info(codec, "cs_8409_clear_external_device_unsolicited_responses UNSOL start\n");
-		list_for_each_entry_safe(unsol_entry, unsol_temp, &pending, list)
-		{
-			unsigned int idx = unsol_entry->idx;
-			list_del_init(&unsol_entry->list);
-			memset(unsol_entry, 0, sizeof(struct unsol_item));
-			spin_lock_irqsave(&spec->unsol_lock, flags);
-			spec->unsol_items_prealloc_used[idx] = 0;
-			spin_unlock_irqrestore(&spec->unsol_lock, flags);
-		}
-		codec_info(codec, "cs_8409_clear_external_device_unsolicited_responses UNSOL end\n");
-	}
-}
-
 static void cs_8409_cs42l83_unsolicited_response_finalize(struct hda_codec *codec, unsigned int res);
 
 static void cs_8409_perform_external_device_unsolicited_responses(struct hda_codec *codec)
@@ -1582,7 +1473,6 @@ static void cs_8409_pcm_playback_pre_prepare_hook(struct hda_pcm_stream *hinfo, 
 		// the stream parameters - so lets let it set the stream parameters every time
 		// but only do the main apple setup once
 		if (1) {
-			struct hda_cvt_setup_apple *p = NULL;
 			//int power_chk = 0;
 
 			// in the new way we set the stream up here using the passed data
@@ -1607,7 +1497,6 @@ static void cs_8409_pcm_playback_pre_prepare_hook(struct hda_pcm_stream *hinfo, 
 		}
 
 		if (spec->play_init_count == 1) {
-			struct hda_cvt_setup_apple *p = NULL;
 
 			// for the moment have junky test here
 			if (spec->jack_present)
