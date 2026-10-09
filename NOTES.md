@@ -55,3 +55,25 @@ types); it defines nothing the kernel's remaining lines use.  The include is del
 of the file: 7.x kernels add a MODULE_IMPORT_NS() line after MODULE_DESCRIPTION, and a hunk anchored at end of
 file then applies with fuzz or fails.  The patch tests prove the hooks apply cleanly; compiling the patched file
 against kernel headers is not done in the test suite and needs hardware validation before merge.
+
+
+Open items (not done, deliberately):
+
+HDA-26 - jack_present is a single tri-state (0 absent, 1 present, 2 unknown) shared by the headphone and
+line-in paths, so the two jacks cannot be told apart.  The planned fix, two booleans (headphone_present /
+linein_present), was NOT made.  `jack_present` is declared in patch_cs8409.h.diff, patch_patch_cs8409.h.diff and
+patches/patch_patch_cs8409.h.{main.pre519,ubuntu.pre51547}.diff, read in patch_cirrus_new84.h (PCM hooks) and
+cirrus_apple.h / patch_cirrus_apple.h (pin sense), and written in patch_cirrus_real84.h, which is where the
+value 2 comes from.  Replacing it touches all of those and changes register-adjacent behaviour that cannot be
+verified without an iMac, so it needs hardware testing and its own plan (with all five declarations changed
+together).  Do it only if hardware testing shows a real jack-detection fault.
+
+HDA-21 - cs_8409_vendor_coef_set_mask() ORs `coef` in unmasked, `(retval & ~mask) | coef`.  Six calls in
+patch_cirrus_real84.h depend on it, three with mask 0 whose only effect is that OR.  The conventional
+`| (coef & mask)` form was not applied for the same reason; tests/test_driver_coef_mask.sh pins the current
+behaviour.
+
+Hardware validation: nothing in the cleanup (HDA-20 unsolicited-event lock, HDA-39 include move, the real84.h and
+installer changes) or the Linux 7.0 work has been run on an iMac.  The cs8409 patches apply to Linux 6.17,
+7.0, 7.1 and 7.2, and the module has been built against 7.0 on x86-64; audio, jack events and suspend/resume are
+unverified.
