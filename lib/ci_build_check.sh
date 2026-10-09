@@ -56,8 +56,10 @@
 
 # --- verdict ---------------------------------------------------------------
 
-# Expected modpost output when Module.symvers is absent.
-_CBC_MODPOST_OK='^(ERROR|WARNING): modpost: ("[^"]*" \[[^]]*\] undefined!|Symbol info of vmlinux is missing)'
+# Expected modpost output when Module.symvers is absent: the undefined
+# symbols, the missing-vmlinux note, the missing-Module.symvers warning and
+# the "suppressed N" summary modpost prints once it has reported 100.
+_CBC_MODPOST_OK='^(ERROR|WARNING): (modpost: ("[^"]*" \[[^]]*\] undefined!|Symbol info of vmlinux is missing|suppressed [0-9]+ unresolved symbol warnings because there were too many\)$)|[^ ]*Module\.symvers is missing\.$)'
 
 # ci_build_verdict <logfile> <make_rc> <cs8409.o path> -- print the
 # diagnostic counts and decide.  Returns 0 only when cs8409.o is non-empty,
