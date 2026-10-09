@@ -27,9 +27,9 @@
 #define mycodec_dbg(codec, fmt, args...) \
         dev_info(hda_codec_dev(codec), fmt, ##args)
 #define myprintk_dbg(fmt, args...) \
-        printk(fmt, ##args)
+        printk(KERN_DEBUG fmt, ##args)
 #define myprintk(fmt, args...) \
-        printk(fmt, ##args)
+        printk(KERN_DEBUG fmt, ##args)
 #else
 #define mycodec_dbg(...)
 #define myprintk_dbg(...)
@@ -41,7 +41,7 @@
 #define mydev_info(codecdev, fmt, args...) \
         dev_info(codecdev, fmt, ##args)
 #define myprintk(fmt, args...) \
-        printk(fmt, ##args)
+        printk(KERN_DEBUG fmt, ##args)
 #else
 #define mycodec_info(...)
 #define mycodec_i2c_info(...)
@@ -934,7 +934,7 @@ void cs_8409_dump_callback(struct hda_codec *codec)
 
         for (i = 0; i < codec->jacktbl.used; i++, jack++) {
                 for (cb = jack->callback; cb; cb = cb->next) {
-		        printk("snd_hda_intel: cs_8409_dump_callback jack num %d nid 0x%02x tag 0x%08x func %pF\n",i,jack->nid,jack->tag,cb->func);
+		        printk(KERN_DEBUG "snd_hda_intel: cs_8409_dump_callback jack num %d nid 0x%02x tag 0x%08x func %pF\n",i,jack->nid,jack->tag,cb->func);
                 }
         }
 
@@ -2195,7 +2195,7 @@ static int cs_8409_apple_create_input_ctls(struct hda_codec *codec)
 	// reduce the adc_nids list to connected items
 	if (nums != spec->num_adc_nids) {
 		/* shrink the invalid adcs and input paths */
-		printk("snd_hda_intel: hda_generic_check_dyn_adc_switch shrinking\n");
+		printk(KERN_DEBUG "snd_hda_intel: hda_generic_check_dyn_adc_switch shrinking\n");
 		nums = 0;
 		for (i = 0; i < imux->num_items; i++) {
 			for (n = 0; n < spec->num_adc_nids; n++) {
