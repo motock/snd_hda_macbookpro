@@ -188,6 +188,72 @@ patch applies with fuzz.
 * I have not verified audio on the iMac 2017 on any 7.x kernel. A successful
   build says nothing about whether sound works.
 
+CI
+-------------
+
+[![tests](https://github.com/motock/snd_hda_macbookpro/actions/workflows/tests.yml/badge.svg?branch=master)](https://github.com/motock/snd_hda_macbookpro/actions/workflows/tests.yml)
+[![build](https://github.com/motock/snd_hda_macbookpro/actions/workflows/build.yml/badge.svg?branch=master)](https://github.com/motock/snd_hda_macbookpro/actions/workflows/build.yml)
+
+Both workflows (`.github/workflows/`) run on every pull request and on pushes to `master`.
+
+**What runs**
+
+* `tests.yml` installs a pinned ShellCheck and runs the whole suite (`bash tests/run.sh`), then
+  `tests/ci/gate.sh` over its output. The gate fails the job on any `FAIL`, on any `XPASS`, and on
+  any `SKIP` of a test not listed in `tests/ci/allowed-skips.list` (empty by default: CI has the
+  toolchain and network, so a skip is a regression). A missing or empty run output also fails.
+* `build.yml` compiles `cs8409.o` with `lib/ci_build_check.sh` against the pinned kernels, one
+  matrix leg each: `new` (6.17.13) and `7x` (7.1.13). Any compiler warning or error fails the leg.
+  The `build-ok` job is the single check to require for branch protection.
+
+Out of scope: the pre-6.17 installer path (`install.cirrus.driver.pre617.sh`), kernels other than
+the pins, and anything that needs real hardware. A green build or test run says nothing about
+whether audio works.
+
+**Run the same checks locally**
+
+```
+bash tests/run.sh | tee run.out; bash tests/ci/gate.sh run.out
+```
+
+Needs bash, GNU patch, xz, gcc, curl and a SHA-256 tool; ShellCheck 0.11.0 for the static-analysis
+tests (without it the baseline comparison is skipped with a note, so a clean local run does not
+prove the ShellCheck step passes in CI). The suite downloads and
+SHA-256-verifies the pinned kernel tarballs on first use; set `HDA_TEST_CACHE` to choose where
+they are cached.
+
+```
+lib/ci_build_check.sh new     # 6.17.13
+lib/ci_build_check.sh 7x      # 7.1.13
+```
+
+These need a Linux host (the kernel build requires GNU Make 4.0 or newer; macOS's make 3.81 fails at
+`defconfig`) with `build-essential flex bison bc libelf-dev libssl-dev` (Ubuntu names), `xz-utils`,
+`patch`, `curl` and `python3`, and take a few minutes. Exit status 0 means `cs8409.o` compiled with
+no diagnostics; 1 is a build or verification failure; 2 is a bad invocation.
+
+**Bump a kernel pin**
+
+Edit `tests/kernel-pins.conf`: set `PIN_<NAME>_VERSION`, `PIN_<NAME>_TARBALL` and
+`PIN_<NAME>_SHA256`. Copy the SHA-256 from the signed `sha256sums.asc` in the matching directory of
+https://cdn.kernel.org/pub/linux/kernel/ (`v6.x` for 6.x, `v7.x` for 7.x), not from a tarball you
+downloaded. The tarball cache key in both workflows hashes that file, so changing it invalidates
+the cache automatically. Update the version numbers quoted in this section. If you add a pin, also
+add its name to `matrix.pin` in `build.yml` and teach `lib/ci_build_check.sh` and
+`tests/lib/kernel_cache.sh` to resolve it.
+
+**Bump ShellCheck**
+
+The version and SHA-256 are the `SHELLCHECK_VERSION` and `SHELLCHECK_SHA256` entries in the `env:`
+block of `.github/workflows/tests.yml`. The release publishes no checksum file, so download the
+`shellcheck-v<version>.linux.x86_64.tar.xz` asset and compute `sha256sum` yourself (it should match
+the digest GitHub shows for the asset). Then run the suite with the new version: new findings must
+be fixed, not added to the baseline.
+
+`tests/shellcheck-baseline.txt` lists accepted findings and is a ratchet: it may only shrink.
+`tests/test_shell_static.sh` fails on a finding that is not listed and on a listed entry that no
+longer fires, so the change that fixes a finding must delete its line.
+
 Dynamic Kernel Module Support (dkms):
 -------------
 
