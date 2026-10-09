@@ -180,6 +180,14 @@ static inline void cs_8409_vendor_coef_set(struct hda_codec *codec, unsigned int
         // appears to return 0
 }
 
+/*
+ * NOTE: coef is OR-ed in WITHOUT being masked, so bits of coef outside mask
+ * are written to the codec.  Callers in patch_cirrus_real84.h rely on this,
+ * including three calls with mask 0x0000 whose only effect is that OR.
+ * The usual "| (coef & mask)" form was deliberately NOT applied: it would
+ * change register writes that cannot be verified without the hardware.
+ * Any change to this expression must be validated on an iMac first.
+ */
 static inline unsigned int cs_8409_vendor_coef_set_mask(struct hda_codec *codec, unsigned int idx,
                                       unsigned int coef, unsigned int mask, unsigned int srcval, int srcidx)
 {
