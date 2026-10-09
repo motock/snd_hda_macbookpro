@@ -203,7 +203,8 @@ Both workflows (`.github/workflows/`) run on every pull request and on pushes to
   any `SKIP` of a test not listed in `tests/ci/allowed-skips.list` (empty by default: CI has the
   toolchain and network, so a skip is a regression). A missing or empty run output also fails.
 * `build.yml` compiles `cs8409.o` with `lib/ci_build_check.sh` against the pinned kernels, one
-  matrix leg each: `new` (6.17.13) and `7x` (7.1.13). Any compiler warning or error fails the leg.
+  matrix leg each: `new` (6.17.13) and `7x` (7.1.13). A compiler error fails the leg, and so does any
+  change in the warning counts (see **Warning ratchet**).
   The `build-ok` job is the single check to require for branch protection.
 
 Out of scope: the pre-6.17 installer path (`install.cirrus.driver.pre617.sh`), kernels other than
@@ -230,7 +231,16 @@ lib/ci_build_check.sh 7x      # 7.1.13
 These need a Linux host (the kernel build requires GNU Make 4.0 or newer; macOS's make 3.81 fails at
 `defconfig`) with `build-essential flex bison bc libelf-dev libssl-dev` (Ubuntu names), `xz-utils`,
 `patch`, `curl` and `python3`, and take a few minutes. Exit status 0 means `cs8409.o` compiled with
-no diagnostics; 1 is a build or verification failure; 2 is a bad invocation.
+no errors and the warning counts equal the baseline; 1 is a build or verification failure; 2 is a bad invocation.
+
+**Warning ratchet**
+
+The build leg counts compiler warnings per file and warning kind and compares them with
+`tests/ci/build-warning-baseline.<pin>.txt` (`<file> <kind> <count>`, sorted). A new, increased or
+unknown-kind warning fails; so does a *lower* count, so a fix cannot be silently lost. To lower the
+baseline after fixing warnings, run the build with `CI_BUILD_WARNINGS_UPDATE=1`, or edit the lines by
+hand, and commit the diff. A missing, empty or malformed baseline fails. The measured total is
+printed next to the baseline total in the build log.
 
 **Bump a kernel pin**
 

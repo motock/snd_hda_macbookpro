@@ -18,10 +18,12 @@
 # is then checked against that pin's SHA-256.
 #
 # Exit status:
-#   0  cs8409.o compiled with no "error:" compiler line (warnings are
-#      counted and reported, never fatal; enforcement is a separate step)
+#   0  cs8409.o compiled with no "error:" compiler line and the warning
+#      counts equal tests/ci/build-warning-baseline.<pin>.txt
 #   1  patch failure, .rej file, compiler error, missing cs8409.o,
-#      checksum mismatch, download failure or missing build tool
+#      checksum mismatch, download failure, missing build tool or a warning
+#      ratchet failure (lib/ci_build_warnings.sh: more, new or fewer
+#      warnings than the baseline; CI_BUILD_WARNINGS_UPDATE=1 rewrites it)
 #   2  bad invocation: no argument, unknown pin, missing tarball (usage shown)
 #
 # Without a full Module.symvers the final modpost step reports the module's
@@ -48,6 +50,9 @@
 # Needs: bash, tar, xz, GNU patch, make, gcc, flex, bison, bc, libelf, libssl
 # headers (Ubuntu: build-essential flex bison bc libelf-dev libssl-dev).
 # Compatible with bash 3.2: no associative arrays, no mapfile.
+
+# shellcheck disable=SC1091
+. "$(dirname "${BASH_SOURCE[0]}")/ci_build_warnings.sh"
 
 # --- verdict ---------------------------------------------------------------
 
@@ -149,6 +154,7 @@ cbc_resolve_tarball() {
       [ "$rc" -eq 0 ] || exit 1
       TARBALL="$(_kc_cache_root)/tarballs/$_KC_TARBALL"
       KVER=$_KC_VERSION
+      PIN=$arg
       return 0
       ;;
   esac
@@ -166,6 +172,7 @@ cbc_resolve_tarball() {
         cbc_die "checksum mismatch for $arg: expected $_KC_SHA256, actual $actual"
       TARBALL=$arg
       KVER=$_KC_VERSION
+      PIN=$which
       return 0
     fi
   done
@@ -293,6 +300,7 @@ EOF
   o=$hda/codecs/cirrus/cs8409.o
   rc_verdict=0
   ci_build_verdict "$SCRATCH/build.log" "$rc" "$o" || rc_verdict=1
+  cbw_check "$SCRATCH/build.log" "$REPO_ROOT/tests/ci/build-warning-baseline.$PIN.txt" || rc_verdict=1
   if [ -s "$o" ]; then
     echo "cs8409.o size: $(wc -c <"$o" | tr -d ' ') bytes"
   fi
