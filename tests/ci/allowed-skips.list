@@ -1,0 +1,15 @@
+# tests/ci/allowed-skips.list -- tests that may SKIP in CI without failing
+# the gate (tests/ci/gate.sh).  Same syntax as tests/xfail.list: one test
+# basename per line, blank lines and # comments ignored.
+#
+# Deliberately EMPTY.  Every skip path in the suite is environmental:
+#   * missing cc / patch / xz / make / sha256 tool -> CI installs these
+#     (never allow-list a skip caused by a missing toolchain);
+#   * pinned kernel tarball not cached/downloadable -> CI has network.
+# So a healthy CI run has zero skips, and any skip is a regression to fix.
+#
+# NOT YET MEASURED: the authoring environment had no container runtime, so
+# the suite could not be run on ubuntu:24.04 with shellcheck, gcc, patch,
+# xz and curl installed.  If a measured run shows a test that genuinely
+# cannot run on the runner (e.g. root-only), add it here with a comment
+# stating why.
