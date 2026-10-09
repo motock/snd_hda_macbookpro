@@ -257,6 +257,7 @@ CONFIG_SND_PCI=y
 CONFIG_SND_HDA_INTEL=m
 CONFIG_SND_HDA_CODEC_CIRRUS=m
 CONFIG_SND_HDA_CODEC_CS8409=m
+CONFIG_WERROR=n
 EOF
   cbc_step "olddefconfig" "$SCRATCH/olddefconfig.log" make -C "$ksrc" olddefconfig
   for o in CONFIG_SND_HDA_CODEC_CIRRUS=m CONFIG_SND_HDA_CODEC_CS8409=m; do
