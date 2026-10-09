@@ -1150,13 +1150,13 @@ static int cs_8409_boot_setup(struct hda_codec *codec)
         }
         else if (codec->core.subsystem_id == 0x106b1000 || codec->core.subsystem_id == 0x106b0f00 || codec->core.subsystem_id == 0x106b0e00) {
 		if (spec->use_data) {
-                        printk("snd_hda_intel: cs_8409_boot_setup pre data not implemented for subsystem id 0x%08x",codec->core.subsystem_id);
+                        printk(KERN_WARNING "snd_hda_intel: cs_8409_boot_setup pre data not implemented for subsystem id 0x%08x",codec->core.subsystem_id);
 		} else {
                         err = cs_8409_real_config(codec);
 		}
         }
         else {
-                printk("snd_hda_intel: UNKNOWN subsystem id 0x%08x",codec->core.subsystem_id);
+                printk(KERN_ERR "snd_hda_intel: UNKNOWN subsystem id 0x%08x",codec->core.subsystem_id);
                 err = -1;
         }
 
@@ -1186,13 +1186,13 @@ void cs_8409_play_setup(struct hda_codec *codec)
 	}
         else if (codec->core.subsystem_id == 0x106b1000 || codec->core.subsystem_id == 0x106b0f00 || codec->core.subsystem_id == 0x106b0e00) {
 		if (spec->use_data) {
-                        printk("snd_hda_intel: cs_8409_play_setup data not implemented for subsystem id 0x%08x",codec->core.subsystem_id);
+                        printk(KERN_WARNING "snd_hda_intel: cs_8409_play_setup data not implemented for subsystem id 0x%08x",codec->core.subsystem_id);
 		} else {
 		        cs_8409_play_real(codec);
 		}
         }
 	else {
-                printk("snd_hda_intel: UNKNOWN subsystem id 0x%08x",codec->core.subsystem_id);
+                printk(KERN_ERR "snd_hda_intel: UNKNOWN subsystem id 0x%08x",codec->core.subsystem_id);
 	}
 }
 
@@ -1220,13 +1220,13 @@ void cs_8409_play_cleanup(struct hda_codec *codec)
 	}
         else if (codec->core.subsystem_id == 0x106b1000 || codec->core.subsystem_id == 0x106b0f00 || codec->core.subsystem_id == 0x106b0e00) {
 		if (spec->use_data) {
-			printk("snd_hda_intel: cs_8409_play_cleanup data not implemented for subsystem id 0x%08x",codec->core.subsystem_id);
+			printk(KERN_WARNING "snd_hda_intel: cs_8409_play_cleanup data not implemented for subsystem id 0x%08x",codec->core.subsystem_id);
 		} else {
 			cs_8409_playstop_real(codec);
 		}
         }
 	else {
-		printk("snd_hda_intel: UNKNOWN subsystem id 0x%08x",codec->core.subsystem_id);
+		printk(KERN_ERR "snd_hda_intel: UNKNOWN subsystem id 0x%08x",codec->core.subsystem_id);
 	}
 
 }
@@ -1248,7 +1248,7 @@ void cs_8409_capture_setup(struct hda_codec *codec)
 		}
 	}
 	else {
-                printk("snd_hda_intel: UNKNOWN subsystem id 0x%08x",codec->core.subsystem_id);
+                printk(KERN_ERR "snd_hda_intel: UNKNOWN subsystem id 0x%08x",codec->core.subsystem_id);
 	}
 }
 
@@ -1266,7 +1266,7 @@ void cs_8409_capture_cleanup(struct hda_codec *codec)
                 }
 	}
 	else {
-                printk("snd_hda_intel: UNKNOWN subsystem id 0x%08x",codec->core.subsystem_id);
+                printk(KERN_ERR "snd_hda_intel: UNKNOWN subsystem id 0x%08x",codec->core.subsystem_id);
 	}
 
 }
@@ -1482,13 +1482,13 @@ void cs_8409_headplay_setup(struct hda_codec *codec)
 	}
         else if (codec->core.subsystem_id == 0x106b1000 || codec->core.subsystem_id == 0x106b0f00 || codec->core.subsystem_id == 0x106b0e00) {
 		if (spec->use_data) {
-                        printk("snd_hda_intel: cs_8409_headplay_setup data not implemented for subsystem id 0x%08x",codec->core.subsystem_id);
+                        printk(KERN_WARNING "snd_hda_intel: cs_8409_headplay_setup data not implemented for subsystem id 0x%08x",codec->core.subsystem_id);
 		} else {
                         cs_8409_headplay_real(codec);
 		}
         }
 	else {
-                printk("snd_hda_intel: UNKNOWN subsystem id 0x%08x",codec->core.subsystem_id);
+                printk(KERN_ERR "snd_hda_intel: UNKNOWN subsystem id 0x%08x",codec->core.subsystem_id);
 	}
 
         // decided this needs moving till all stream setup verbs done
@@ -1523,13 +1523,13 @@ void cs_8409_headplay_cleanup(struct hda_codec *codec)
 	}
         else if (codec->core.subsystem_id == 0x106b1000 || codec->core.subsystem_id == 0x106b0f00 || codec->core.subsystem_id == 0x106b0e00) {
 		if (spec->use_data) {
-                        printk("snd_hda_intel: cs_8409_headplay_cleanup data not implemented for subsystem id 0x%08x",codec->core.subsystem_id);
+                        printk(KERN_WARNING "snd_hda_intel: cs_8409_headplay_cleanup data not implemented for subsystem id 0x%08x",codec->core.subsystem_id);
 		} else {
                         cs_8409_headplaystop_real(codec);
 		}
         }
 	else {
-                printk("snd_hda_intel: UNKNOWN subsystem id 0x%08x",codec->core.subsystem_id);
+                printk(KERN_ERR "snd_hda_intel: UNKNOWN subsystem id 0x%08x",codec->core.subsystem_id);
 	}
 
         // decided this needs moving till all stream cleanup verbs done
@@ -1558,7 +1558,7 @@ void cs_8409_headcapture_setup(struct hda_codec *codec)
                 }
 	}
 	else {
-                printk("snd_hda_intel: UNKNOWN subsystem id 0x%08x",codec->core.subsystem_id);
+                printk(KERN_ERR "snd_hda_intel: UNKNOWN subsystem id 0x%08x",codec->core.subsystem_id);
 	}
 
         // decided this needs moving till all stream setup verbs done
@@ -1585,7 +1585,7 @@ void cs_8409_headcapture_cleanup(struct hda_codec *codec)
 		}
 	}
 	else {
-                printk("snd_hda_intel: UNKNOWN subsystem id 0x%08x",codec->core.subsystem_id);
+                printk(KERN_ERR "snd_hda_intel: UNKNOWN subsystem id 0x%08x",codec->core.subsystem_id);
 	}
 
         // decided this needs moving till all stream cleanup verbs done
