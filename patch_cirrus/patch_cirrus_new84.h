@@ -1915,28 +1915,6 @@ static void cs_8409_capture_pcm_hook(struct hda_pcm_stream *hinfo, struct hda_co
 
         myprintk_dbg("snd_hda_intel: command cs_8409_capture_pcm_hook HOOK init post stack");
 
-        // - so this seems to be the critical issue - this can apparently be called with a NULL codec!!!
-        // only thing to do seems to be to return!!
-        if (codec == NULL) {
-                struct hda_codec *badptr = NULL;
-                printk("snd_hda_intel: command cs_8409_capture_pcm_hook HOOK init  - CODEC NULL");
-                // so if we are here it looks as tho we have been called from call_hp_automute
-                // - in which the codec is the 1st arg
-                badptr = (struct hda_codec *) hinfo;
-                spec = badptr->spec;
-                printk("snd_hda_intel: cs_8409_capture_pcm_hook -  pcm_playback_hook %p", spec->gen.pcm_playback_hook);
-                printk("snd_hda_intel: cs_8409_capture_pcm_hook -   pcm_capture_hook %p", spec->gen.pcm_capture_hook);
-                printk("snd_hda_intel: cs_8409_capture_pcm_hook -   hp_automute_hook %p", spec->gen.hp_automute_hook);
-                printk("snd_hda_intel: cs_8409_capture_pcm_hook - line_automute_hook %p", spec->gen.line_automute_hook);
-                printk("snd_hda_intel: cs_8409_capture_pcm_hook - line_automute_hook %p", spec->gen.mic_autoswitch_hook);
-                printk("snd_hda_intel: command cs_8409_capture_pcm_hook HOOK init  - CODEC NULL exit");
-                return;
-        }
-        else
-	{
-                myprintk_dbg("snd_hda_intel: command cs_8409_capture_pcm_hook HOOK init  - CODEC NOT NULL");
-	}
-
         //dump_stack();
 
         spec = codec->spec;
