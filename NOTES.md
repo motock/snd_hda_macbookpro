@@ -89,8 +89,10 @@ installer changes) or the Linux 7.0 work has been run on an iMac.  The cs8409 pa
 unverified.
 
 Hardware result, 2026-10-10: the driver, built from the linux-7.0.14 mainline sound/hda sources, was installed on
-an iMac18,2 (i5-7400) running Ubuntu 7.0.0-38-generic (upstream 7.0.14) and sound output works.  NOT checked on
-that run: jack/headset events, the internal microphone, suspend/resume.  The caveats above still apply to those.
+an iMac18,2 (i5-7400) running Ubuntu 7.0.0-38-generic (upstream 7.0.14) and sound output works: the built-in speakers
+and the headphone output both play (re-verified after pulling master and rerunning the unmodified installer).
+The microphone did not work; whether it worked under macOS is unknown.  NOT checked: headset-mic/jack-event
+behaviour, suspend/resume.  The caveats above still apply to those.
 
 The failure that preceded it: a module built from base linux-7.0 sources oopsed at probe (UBSAN
 array-index-out-of-bounds in generic.c fill_input_pin_labels, then a general protection fault in strcmp).

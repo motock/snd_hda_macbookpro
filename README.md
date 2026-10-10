@@ -187,8 +187,11 @@ patch applies with fuzz.
 
 * `make test` runs the bash tests only. They do not run on real iMac hardware
   and need no kernel headers.
-* I have not verified audio on the iMac 2017 on any 7.x kernel. A successful
-  build says nothing about whether sound works.
+* Verified on hardware: an iMac 2017 (iMac18,2) running Ubuntu 24.04 with the 7.0.0-38 HWE kernel
+  (upstream 7.0.14). The built-in speakers and the headphone output work. The microphone did not
+  work in that test (I do not know whether it worked under macOS), and suspend/resume has not been
+  tested. No other 7.x kernel or Mac model has been tested. A successful build alone says nothing
+  about whether sound works.
 
 CI
 -------------
