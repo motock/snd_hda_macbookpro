@@ -207,6 +207,22 @@ Both workflows (`.github/workflows/`) run on every pull request and on pushes to
   change in the warning counts (see **Warning ratchet**).
   The `build-ok` job is the single check to require for branch protection.
 
+**Required checks**
+
+As of master `a8bf1d1`, both workflows conclude `success`, including every matrix leg
+([tests run](https://github.com/motock/snd_hda_macbookpro/actions/runs/38022171084),
+[build run](https://github.com/motock/snd_hda_macbookpro/actions/runs/38022171147)).
+They are ready to be made required checks. Configure exactly these names, as GitHub reports them:
+
+* `tests`
+* `build-ok`
+
+Do not require the matrix legs `build (new)` and `build (7x)` separately: `build-ok` fails if either
+leg fails, so it covers both and survives adding or renaming a pin.
+
+The warning-count baselines are `tests/ci/build-warning-baseline.new.txt` (6.17.13) and
+`tests/ci/build-warning-baseline.7x.txt` (7.1.13); to lower them, see **Warning ratchet** below.
+
 Out of scope: the pre-6.17 installer path (`install.cirrus.driver.pre617.sh`), kernels other than
 the pins, and anything that needs real hardware. A green build or test run says nothing about
 whether audio works.
