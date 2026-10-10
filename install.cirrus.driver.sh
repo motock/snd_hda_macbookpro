@@ -373,6 +373,14 @@ if [ $isubuntu -ge 1 ]; then
 		if [ -n "$upstream_version" ]; then
 			kernel_version=$upstream_version
 		else
+			# A DKMS build runs unattended at kernel upgrade: a failed build shows in `dkms status`, whereas
+			# a module built from mismatched base headers installs fine and then oopses at boot with no sound.
+			# A vendored snapshot covering the base release is known-good, so only refuse when none does.
+			if [ "${dkms:-}" = true ] && [ -z "$(find_vendored_snapshot "$major_version.$minor_version")" ]; then
+				echo "error: kernel $UNAME: the upstream point release could not be determined and no vendored snapshot covers the base $major_version.$minor_version release; refusing the DKMS build because a module built from mismatched headers would oops at load" >&2
+				echo "install the matching linux-headers-$UNAME package so the point release can be read, or build interactively (without --dkms): ./install.cirrus.driver.sh -k $UNAME" >&2
+				exit 1
+			fi
 			warn_base_release_layout
 			# the full x.y.z tarball is not what we want here, so start from the base x.y release
 			kernel_version=$major_version.$minor_version
