@@ -102,10 +102,10 @@ xbps-install -S gcc make linux-headers patch wget
 
 **build driver**  
 ```
-git clone https://github.com/davidjo/snd_hda_macbookpro.git
+git clone https://github.com/motock/snd_hda_macbookpro.git
 cd snd_hda_macbookpro/
-#run the following command as root or with sudo
-./install.cirrus.driver.sh
+#the installer writes to /lib/modules, so it must run as root
+sudo ./install.cirrus.driver.sh
 reboot
 ```
 
