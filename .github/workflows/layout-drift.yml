@@ -1,0 +1,63 @@
+name: layout-drift
+
+# Weekly check that vendor/LAYOUT-TABLE still describes the stable kernels
+# (tools/layout-drift.sh). Exit 1 = drift or an uncovered release: one issue
+# is opened, or commented on if one is already open. Exit 2 = the check itself
+# failed (network, bad table): the job fails and no issue is opened.
+# Never runs on pull requests: it needs the network and writes issues.
+
+on:
+  schedule:
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: layout-drift
+  cancel-in-progress: false
+
+jobs:
+  drift:
+    name: layout drift
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check layout drift
+        id: drift
+        run: |
+          set +e
+          bash tools/layout-drift.sh > "$RUNNER_TEMP/drift.out" 2>&1
+          rc=$?
+          cat "$RUNNER_TEMP/drift.out"
+          echo "rc=$rc" >> "$GITHUB_OUTPUT"
+          # 0 = nothing to do, 1 = findings (reported below); anything else fails the job
+          if [ "$rc" -gt 1 ]; then exit "$rc"; fi
+
+      - name: Open or update the drift issue
+        if: steps.drift.outputs.rc == '1'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          gh label create layout-drift --description "kernel header layout drift" 2> /dev/null || true
+          {
+            echo '```'
+            cat "$RUNNER_TEMP/drift.out"
+            echo '```'
+          } > "$RUNNER_TEMP/body.md"
+          existing=$(gh issue list --label layout-drift --state open --limit 1 --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body-file "$RUNNER_TEMP/body.md"
+          else
+            gh issue create --label layout-drift \
+              --title "kernel layout drift: $(date -u +%Y-%m-%d)" \
+              --body-file "$RUNNER_TEMP/body.md"
+          fi

@@ -64,3 +64,15 @@ checks that the manifests, table and snapshots agree.
 To check a release without downloading its tarball, fetch the closure files
 from `https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/plain/<path>?h=v<version>`
 into a `sound/hda` tree and run `tools/layout-hash.sh` on it.
+
+## Drift check
+
+`tools/layout-drift.sh` compares every stable release of the table's series
+(or `--series 7.0,7.1`) with `vendor/LAYOUT-TABLE`, fetching only the closure
+files from git.kernel.org. It prints `COVERED`, `DRIFT` (a release inside a
+range hashes differently: the range is no longer valid) or `UNCOVERED` (newer
+than every range: extend the range when the hash is equal, otherwise vendor a
+new snapshot) and the vendoring commands for each finding. Exit 0: nothing to
+do; 1: findings; 2: bad usage, bad table or a failed fetch (never reported as
+drift). `.github/workflows/layout-drift.yml` runs it weekly and files one
+`layout-drift` issue (commenting on the open one instead of duplicating).
