@@ -297,6 +297,22 @@ You will need to first install dkms on your system
 sudo ./install.cirrus.driver.sh -i
 ```
 
+**Installing the .deb**
+
+Releases carry a Debian/Ubuntu package that installs the sources for dkms, so the module is rebuilt
+for each new kernel automatically. Download `snd-hda-macbookpro-dkms_<version>_all.deb` from the
+release page, then:
+```
+sudo apt install ./snd-hda-macbookpro-dkms_<version>_all.deb
+dkms status
+```
+`dkms status` should list `snd_hda_macbookpro/<version>` as installed for your running kernel.
+Remove it with `sudo apt remove snd-hda-macbookpro-dkms`.
+
+This package is verified only on an iMac18,2 (iMac 2017) with Ubuntu kernel 7.0.0-38. Kernels
+without a vendored snapshot make dkms download the kernel source, so the build needs network access
+there. No other Mac or kernel is claimed to work.
+
 **installer options**
 
 `install.cirrus.driver.sh` and `install.cirrus.driver.pre617.sh` accept:
