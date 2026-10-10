@@ -1,5 +1,4 @@
-codecs/cirrus/cirrus_apple.h unused-function 8
-codecs/cirrus/cirrus_apple.h unused-variable 22
+codecs/cirrus/cirrus_apple.h unused-variable 1
 codecs/cirrus/patch_cirrus_real84.h unused-function 18
 codecs/cirrus/patch_cirrus_real84.h unused-variable 21
 codecs/cirrus/patch_cirrus_real84_i2c.h unused-function 11
