@@ -252,6 +252,76 @@ warn_base_release_layout() {
 	echo "warning: using the base $major_version.$minor_version release, which may not match the target kernel's struct layout; the built module may oops at load" >&2
 }
 
+# Print the snapshot directory name that covers kernel version $1 in vendor/LAYOUT-TABLE, or nothing.
+# The table is only parsed, never sourced. Fields: <first> <last> <snapshot> <layout-hash>; a bad
+# line is skipped with a warning. Versions compare numerically per component (sort -V), with a
+# base release x.y read as x.y.0.
+find_vendored_snapshot() {
+	local table="$repo_dir/vendor/LAYOUT-TABLE" version=$1 first last name hash extra line_no=0
+	[ -r "$table" ] || return 0
+	[[ $version =~ ^[0-9]+\.[0-9]+$ ]] && version=$version.0
+	while read -r first last name hash extra || [ -n "$first" ]; do
+		line_no=$((line_no + 1))
+		[[ -z $first || $first == \#* ]] && continue
+		if [[ -n $extra || ! $first =~ ^[0-9]+(\.[0-9]+)+$ || ! $last =~ ^[0-9]+(\.[0-9]+)+$ \
+			|| ! $name =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ || ! $hash =~ ^[0-9a-f]{64}$ ]]; then
+			echo "warning: ignoring malformed line $line_no of vendor/LAYOUT-TABLE" >&2
+			continue
+		fi
+		if version_lt "$last" "$first"; then
+			echo "warning: ignoring line $line_no of vendor/LAYOUT-TABLE: last version precedes first" >&2
+			continue
+		fi
+		if ! version_lt "$version" "$first" && ! version_lt "$last" "$version"; then
+			echo "$name"
+			return 0
+		fi
+	done < "$table"
+}
+
+sha256_of() {
+	if command -v sha256sum > /dev/null 2>&1; then
+		sha256sum "$1" | cut -c1-64
+	else
+		shasum -a 256 "$1" | cut -c1-64
+	fi
+}
+
+# Check every file of a snapshot's sound/ tree against its MANIFEST before anything is copied.
+# Fails closed: a missing MANIFEST, a hash mismatch, a missing file, or a file the MANIFEST does not list.
+verify_vendored_snapshot() {
+	local snapshot=$1 manifest="$1/MANIFEST" hash path listed=0 present
+	if [ ! -r "$manifest" ]; then
+		echo "error: vendored snapshot has no readable MANIFEST: ${snapshot##*/}" >&2
+		return 1
+	fi
+	while read -r hash path || [ -n "$hash" ]; do
+		[[ $path == sound/* && $hash =~ ^[0-9a-f]{64}$ && $path != *..* ]] || continue
+		if [ ! -f "$snapshot/$path" ] || [ "$(sha256_of "$snapshot/$path")" != "$hash" ]; then
+			echo "error: vendored snapshot ${snapshot##*/} fails MANIFEST verification at $path" >&2
+			return 1
+		fi
+		listed=$((listed + 1))
+	done < "$manifest"
+	present=$(find "$snapshot/sound" -type f | wc -l)
+	if [ "$listed" -eq 0 ] || [ "$listed" -ne "$present" ]; then
+		echo "error: vendored snapshot ${snapshot##*/} does not match its MANIFEST ($listed listed, $present present)" >&2
+		return 1
+	fi
+}
+
+# Recreate what extracting sound/hda from the tarball leaves in $hda_dir. The snapshot holds only the
+# header closure, so the Makefiles the later steps move aside are created empty.
+install_vendored_snapshot() {
+	local snapshot="$repo_dir/vendor/$1"
+	verify_vendored_snapshot "$snapshot" || return 1
+	mkdir -p "$hda_dir" || return 1
+	cp -R "$snapshot/sound/hda/." "$hda_dir/" || return 1
+	mkdir -p "$hda_dir/common" "$hda_dir/codecs/cirrus" || return 1
+	: > "$hda_dir/Makefile" && : > "$hda_dir/common/Makefile" \
+		&& : > "$hda_dir/codecs/Makefile" && : > "$hda_dir/codecs/cirrus/Makefile"
+}
+
 # Print the upstream version from a kernel headers Makefile, or nothing when it is unusable. The Makefile is
 # only parsed, never sourced; each field must be a plain number and x.y must match the target kernel.
 # SUBLEVEL 0 means the base release, which kernel.org publishes as x.y rather than x.y.0.
@@ -312,12 +382,20 @@ if [ $isubuntu -ge 1 ]; then
 	fi
 fi
 
+vendored_snapshot=""
+[ $use_ubuntu_source -ge 1 ] || vendored_snapshot=$(find_vendored_snapshot "$kernel_version")
+
 if [ $use_ubuntu_source -ge 1 ]; then
 
 	tar --strip-components=2 -xvf "/usr/src/linux-source-$kernel_version.tar.bz2" --directory="$build_dir" "linux-source-$kernel_version/sound/hda"
 
+elif [ -n "$vendored_snapshot" ]; then
+	echo "using vendored snapshot $vendored_snapshot for kernel $kernel_version"
+	install_vendored_snapshot "$vendored_snapshot" || exit 1
+
 else
 	# here we assume the distribution kernel source is essentially the mainline kernel source
+	echo "no vendored snapshot for $kernel_version; downloading from cdn.kernel.org"
 
 	set +e
 

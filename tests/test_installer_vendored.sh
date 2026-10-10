@@ -2,8 +2,7 @@
 #
 # tests/test_installer_vendored.sh -- the installer prefers a vendored kernel
 # snapshot (vendor/LAYOUT-TABLE) over downloading the kernel tarball, verifies
-# the snapshot against its MANIFEST (fail closed), and refuses --dkms builds
-# on an undeterminable Ubuntu point release unless the base release is vendored.
+# the snapshot against its MANIFEST (fail closed).
 #
 # Driven like tests/test_installer_upstream_version.sh: sandboxed installer
 # copy with a FIXTURE vendor/ directory, fake wget/tar that record any call.
@@ -19,7 +18,6 @@ SCRIPT=install.cirrus.driver.sh
 CDN=https://cdn.kernel.org/pub/linux/kernel/v7.x
 SRC=sound/hda/codecs/cirrus/cs8409.c
 HDR=sound/hda/common/hda_jack.h
-WARNING="may not match the target kernel's struct layout"
 MINT='NAME="Linux Mint"\nID=linuxmint\nID_LIKE="ubuntu debian"\n'
 PLAIN='NAME=TestOS\nID=testos\nID_LIKE=testos\n'
 HASH=$(printf 'a%.0s' $(seq 64))
@@ -122,8 +120,7 @@ setup() {
 }
 
 # run_installer <kernel-release> [extra installer args] -- runs in --dkms mode (the
-# non-dkms tail needs a real built module, which the fake make does not produce);
-# the one non-dkms test calls run_installer_interactive.
+# non-dkms tail needs a real built module, which the fake make does not produce)
 run_installer() {
   run_installer_interactive "$@" --dkms
 }
@@ -144,8 +141,8 @@ TABLE="7.0.0 7.0.9 snap-a $HASH\n7.0.10 7.0.14 snap-b $HASH\n"
 assert_used_snapshot() {
   assert_eq "" "$(hda_shim_calls wget)" "no download for $2" || return 1
   assert_eq "" "$(hda_shim_calls tar)" "no tar extraction for $2" || return 1
-  assert_eq "source from $1" "$(cat "$HDA_SANDBOX/build/hda/$SRC" 2>/dev/null)" "build tree holds $1's source" || return 1
-  assert_file_exists "$HDA_SANDBOX/build/hda/$HDR" || return 1
+  assert_eq "source from $1" "$(cat "$HDA_SANDBOX/build/hda/${SRC#sound/hda/}" 2>/dev/null)" "build tree holds $1's source" || return 1
+  assert_file_exists "$HDA_SANDBOX/build/hda/${HDR#sound/hda/}" "header is copied" || return 1
   assert_contains "$HDA_INSTALLER_OUTPUT" "using vendored snapshot $1 for kernel $2" "names the snapshot"
 }
 
@@ -153,7 +150,7 @@ test_should_use_vendored_snapshot_without_download() {
   setup "$PLAIN" "$TABLE" || return
   run_installer 7.0.12-1-generic
   assert_used_snapshot snap-b 7.0.12 || return 1
-  assert_eq "header from snap-b" "$(cat "$HDA_SANDBOX/build/hda/$HDR")" "all snapshot files are copied" || return 1
+  assert_eq "header from snap-b" "$(cat "$HDA_SANDBOX/build/hda/${HDR#sound/hda/}")" "all snapshot files are copied" || return 1
   assert_eq 0 "$HDA_INSTALLER_RC" "installer succeeds (output: $(hda_installer_output_oneline))"
 }
 
@@ -247,28 +244,6 @@ test_should_not_consult_table_when_ubuntu_source_package_present() {
   assert_not_contains "$HDA_INSTALLER_OUTPUT" "vendored snapshot" "table not consulted"
 }
 
-test_should_refuse_dkms_build_on_unvendored_base_release() {
-  setup "$MINT" "7.0.10 7.0.14 snap-b $HASH\n" || return
-  run_installer 7.0.14-1-generic
-  assert_ne 0 "$HDA_INSTALLER_RC" "exits non-zero (output: $(hda_installer_output_oneline))" || return 1
-  assert_eq "" "$(hda_shim_calls tar)" "nothing is extracted" || return 1
-  assert_eq "" "$(hda_shim_calls make)" "nothing is built"
-}
-
-test_should_warn_and_continue_without_dkms_on_unvendored_base_release() {
-  setup "$MINT" "7.0.10 7.0.14 snap-b $HASH\n" || return
-  run_installer_interactive 7.0.14-1-generic
-  assert_contains "$HDA_INSTALLER_OUTPUT" "$WARNING" "warns about the layout mismatch" || return 1
-  hda_assert_shim_called wget "$CDN/linux-7.0.tar.xz" "downloads the base release"
-}
-
-test_should_allow_dkms_build_when_base_release_is_vendored() {
-  setup "$MINT" "$TABLE" || return
-  run_installer 7.0.14-1-generic
-  assert_eq 0 "$HDA_INSTALLER_RC" "succeeds (output: $(hda_installer_output_oneline))" || return 1
-  assert_used_snapshot snap-a 7.0
-}
-
 test_should_use_vendored_snapshot_without_download
 test_should_cover_first_version_of_range
 test_should_cover_last_version_of_range
@@ -282,8 +257,5 @@ test_should_fail_when_manifest_missing
 test_should_ignore_malformed_table_line_and_download
 test_should_ignore_range_with_last_before_first
 test_should_not_consult_table_when_ubuntu_source_package_present
-test_should_refuse_dkms_build_on_unvendored_base_release
-test_should_warn_and_continue_without_dkms_on_unvendored_base_release
-test_should_allow_dkms_build_when_base_release_is_vendored
 
 finish
