@@ -211,6 +211,10 @@ elif [ "$(grep '^ID=' "$os_release" | grep -c "ubuntu")" -eq 1 ]; then
         isubuntu=1
 fi
 
+warn_base_release_layout() {
+	echo "warning: using the base $major_version.$minor_version release, which may not match the target kernel's struct layout; the built module may oops at load" >&2
+}
+
 use_ubuntu_source=0
 mainline_fallback=0
 if [ $isubuntu -ge 1 ]; then
@@ -225,11 +229,29 @@ if [ $isubuntu -ge 1 ]; then
 	if [ -e "/usr/src/linux-source-$kernel_version.tar.bz2" ]; then
 		use_ubuntu_source=1
 	else
-		echo "linux-source-$kernel_version not found; using mainline kernel $major_version.$minor_version sources from cdn.kernel.org instead"
-		echo "(to use the Ubuntu kernel sources instead: sudo apt install linux-source-$kernel_version)"
 		mainline_fallback=1
-		# the full x.y.z tarball is not what we want here, so start from the base x.y release
-		kernel_version=$major_version.$minor_version
+		package_version=$kernel_version
+		# The module must be built against headers whose struct layouts match the running kernel, and
+		# stable point releases change them (eg 7.0.10 grew hda_multi_out, so a module built from base 7.0
+		# oopses at probe on 7.0.14). /proc/version_signature ends with the upstream version the Ubuntu
+		# kernel is based on. HDA_VERSION_SIGNATURE overrides the file so tests can fake it.
+		version_signature=${HDA_VERSION_SIGNATURE:-/proc/version_signature}
+		upstream_version=""
+		if [ -r "$version_signature" ] && [ "$UNAME" = "$(uname -r)" ]; then
+			upstream_version=$(awk 'NF { last=$NF } END { print last }' "$version_signature")
+			if ! [[ $upstream_version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ && ${upstream_version%.*} = "$major_version.$minor_version" ]]; then
+				upstream_version=""
+			fi
+		fi
+		if [ -n "$upstream_version" ]; then
+			kernel_version=$upstream_version
+		else
+			warn_base_release_layout
+			# the full x.y.z tarball is not what we want here, so start from the base x.y release
+			kernel_version=$major_version.$minor_version
+		fi
+		echo "linux-source-$package_version not found; using mainline kernel $kernel_version sources from cdn.kernel.org instead"
+		echo "(to use the Ubuntu kernel sources instead: sudo apt install linux-source-$package_version)"
 	fi
 fi
 
@@ -252,6 +274,19 @@ else
 	rc=$?
 
 	if [[ $rc -eq 0 ]]; then
+		verify_kernel_tarball "$build_dir/linux-$kernel_version.tar.xz" "$kernel_version" || exit 1
+	elif [ $mainline_fallback -ge 1 ] && [ "$kernel_version" != "$major_version.$minor_version" ]; then
+		echo "Failed to download linux-$kernel_version.tar.xz; trying the base release linux-$major_version.$minor_version.tar.xz"
+		warn_base_release_layout
+		kernel_version=$major_version.$minor_version
+		[[ -f $build_dir/linux-$kernel_version.tar.xz ]] && { verify_kernel_tarball "$build_dir/linux-$kernel_version.tar.xz" "$kernel_version" || true; }
+		wget -c "https://cdn.kernel.org/pub/linux/kernel/v$major_version.x/linux-$kernel_version.tar.xz" -P "$build_dir"
+		rc=$?
+
+		if [[ $rc -ne 0 ]]; then
+			echo "kernel $UNAME: failed to download linux-$kernel_version.tar.xz...exiting" >&2
+			exit 1
+		fi
 		verify_kernel_tarball "$build_dir/linux-$kernel_version.tar.xz" "$kernel_version" || exit 1
 	elif [ $mainline_fallback -ge 1 ]; then
 		echo "kernel $UNAME: failed to download linux-$kernel_version.tar.xz...exiting" >&2
