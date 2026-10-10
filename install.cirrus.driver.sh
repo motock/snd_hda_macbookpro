@@ -94,6 +94,13 @@ fi
 
 PATCH_CIRRUS=false
 
+# Persistent staged copy of the tree for dkms (see the install branch).  Sits
+# next to the /usr/src/snd_hda_macbookpro-0.1 symlink dkms.sh creates.
+# SND_HDA_USR_SRC lets the tests redirect /usr/src into a sandbox.
+usr_src=${SND_HDA_USR_SRC:-/usr/src}
+src_link="$usr_src/snd_hda_macbookpro-0.1"
+stage_dir="$usr_src/snd_hda_macbookpro-0.1.src"
+
 # remove a non-dkms cs8409 module from $1, in whichever compression the
 # kernel build used, so a stale copy cannot shadow the dkms build
 remove_stale_cs8409() {
@@ -113,11 +120,36 @@ if [[ $dkms_action == 'install' ]]; then
     update_dir="/lib/modules/${UNAME}/updates/codecs/cirrus"
     remove_stale_cs8409 "$update_dir"
 
-    # run dkms install script
+    # dkms.sh symlinks the directory it runs from into /usr/src and dkms keeps
+    # rebuilding from that link on kernel updates (AUTOINSTALL), so running it
+    # from the git checkout would break every later rebuild once the checkout
+    # is moved or deleted.  Stage a copy that outlives this script instead: it
+    # is removed only if the install fails or on uninstall.  The copy is
+    # unedited, so dkms reads the tracked dkms.conf values.
+    rm -rf "$stage_dir"
+    mkdir -p "$stage_dir" || { echo "cannot create a staging directory" >&2; exit 1; }
+
+    for _entry in "$repo_dir"/*; do
+        [[ -e $_entry ]] || continue
+        case "${_entry##*/}" in
+            # build/ is a previous run's output and tests/ is not needed by dkms
+            build|tests) continue ;;
+        esac
+        cp -R "$_entry" "$stage_dir/" || { echo "cannot stage $_entry" >&2; exit 1; }
+    done
+
+    # dkms.sh only creates the link when nothing is there, so a link left by an
+    # older install (pointing at the checkout) would keep dkms on the checkout
+    [[ -L $src_link ]] && rm -f "$src_link"
+
+    # run dkms install script against the staged copy
     rc=0
-    bash dkms.sh || rc=$?
+    ( cd "$stage_dir" && bash dkms.sh ) || rc=$?
     if [[ $rc -ne 0 ]]; then
         echo "dkms install failed (exit $rc)" >&2
+        # leave no half-state behind: the staged copy and the link into it
+        rm -rf "$stage_dir"
+        [[ -L $src_link && ! -e $src_link ]] && rm -f "$src_link"
     fi
 
     # note that Ubuntu, Debian, Fedora and others (see dkms man page) install to updates/dkms
@@ -138,6 +170,11 @@ elif [[ $dkms_action == 'remove' ]]; then
     if [[ $rc -ne 0 ]]; then
         echo "dkms remove failed (exit $rc)" >&2
     fi
+
+    # the staged copy is no longer needed either way; clear it, then any link
+    # left dangling by it (dkms.sh -r only removes a link that resolves)
+    rm -rf "$stage_dir"
+    [[ -L $src_link && ! -e $src_link ]] && rm -f "$src_link"
 
     exit "$rc"
 
