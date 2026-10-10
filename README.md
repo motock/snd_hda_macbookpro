@@ -85,7 +85,9 @@ the kernel's `x.y.z` (for example `6.8.0`), so also run `sudo apt install linux-
 What happens without it depends on the installer:
 
 * `install.cirrus.driver.sh` (kernel 6.17 and later) falls back to downloading the verified mainline
-  `x.y` tarball from cdn.kernel.org. The package is optional but preferred, since it carries
+  tarball from cdn.kernel.org: the upstream point release reported by `/proc/version_signature`
+  (for example `7.0.14`) when it matches the running kernel, and the base `x.y` release only
+  otherwise (with a warning, since its struct layouts may differ and the module may oops at load). The package is optional but preferred, since it carries
   Ubuntu's backports (see the kernel 7.0 section below).
 * `install.cirrus.driver.pre617.sh` (kernels below 6.17) does not download on Ubuntu; it stops and
   tells you to install `linux-source-<version>`. The package is required.
