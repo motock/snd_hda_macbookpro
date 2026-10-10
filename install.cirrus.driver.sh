@@ -215,6 +215,24 @@ warn_base_release_layout() {
 	echo "warning: using the base $major_version.$minor_version release, which may not match the target kernel's struct layout; the built module may oops at load" >&2
 }
 
+# Print the upstream version from a kernel headers Makefile, or nothing when it is unusable. The Makefile is
+# only parsed, never sourced; each field must be a plain number and x.y must match the target kernel.
+# SUBLEVEL 0 means the base release, which kernel.org publishes as x.y rather than x.y.0.
+headers_upstream_version() {
+	local makefile=$1 version patchlevel sublevel
+	[ -r "$makefile" ] || return 0
+	version=$(awk '/^VERSION = / { sub(/^VERSION = /, ""); print; exit }' "$makefile")
+	patchlevel=$(awk '/^PATCHLEVEL = / { sub(/^PATCHLEVEL = /, ""); print; exit }' "$makefile")
+	sublevel=$(awk '/^SUBLEVEL = / { sub(/^SUBLEVEL = /, ""); print; exit }' "$makefile")
+	[[ $version =~ ^[0-9]+$ && $patchlevel =~ ^[0-9]+$ && $sublevel =~ ^[0-9]+$ ]] || return 0
+	[ "$((10#$version)).$((10#$patchlevel))" = "$major_version.$minor_version" ] || return 0
+	if [ "$((10#$sublevel))" -eq 0 ]; then
+		echo "$major_version.$minor_version"
+	else
+		echo "$major_version.$minor_version.$((10#$sublevel))"
+	fi
+}
+
 use_ubuntu_source=0
 mainline_fallback=0
 if [ $isubuntu -ge 1 ]; then
@@ -233,11 +251,13 @@ if [ $isubuntu -ge 1 ]; then
 		package_version=$kernel_version
 		# The module must be built against headers whose struct layouts match the running kernel, and
 		# stable point releases change them (eg 7.0.10 grew hda_multi_out, so a module built from base 7.0
-		# oopses at probe on 7.0.14). /proc/version_signature ends with the upstream version the Ubuntu
-		# kernel is based on. HDA_VERSION_SIGNATURE overrides the file so tests can fake it.
+		# oopses at probe on 7.0.14). The target's headers Makefile carries its real upstream version whether or
+		# not it is the running kernel (DKMS rebuilds for the new kernel while the old one still runs), so it is
+		# tried first. Failing that, /proc/version_signature ends with the upstream version of the running Ubuntu
+		# kernel. HDA_VERSION_SIGNATURE overrides the file so tests can fake it.
+		upstream_version=$(headers_upstream_version "/usr/src/linux-headers-${UNAME}/Makefile")
 		version_signature=${HDA_VERSION_SIGNATURE:-/proc/version_signature}
-		upstream_version=""
-		if [ -r "$version_signature" ] && [ "$UNAME" = "$(uname -r)" ]; then
+		if [ -z "$upstream_version" ] && [ -r "$version_signature" ] && [ "$UNAME" = "$(uname -r)" ]; then
 			upstream_version=$(awk 'NF { last=$NF } END { print last }' "$version_signature")
 			if ! [[ $upstream_version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ && ${upstream_version%.*} = "$major_version.$minor_version" ]]; then
 				upstream_version=""
