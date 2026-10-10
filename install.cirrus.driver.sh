@@ -272,6 +272,7 @@ headers_upstream_version() {
 
 use_ubuntu_source=0
 mainline_fallback=0
+base_release_guessed=0
 if [ $isubuntu -ge 1 ]; then
 	# NOTE for Ubuntu we prefer the distribution kernel sources as they seem
 	# to be significantly modified from the mainline kernel sources generally with backports from later kernels
@@ -304,6 +305,7 @@ if [ $isubuntu -ge 1 ]; then
 			kernel_version=$upstream_version
 		else
 			warn_base_release_layout
+			base_release_guessed=1
 			# the full x.y.z tarball is not what we want here, so start from the base x.y release
 			kernel_version=$major_version.$minor_version
 		fi
@@ -312,11 +314,113 @@ if [ $isubuntu -ge 1 ]; then
 	fi
 fi
 
+# Pad a bare x.y release to x.y.0 so that it compares equal to the x.y.0 that
+# vendor/LAYOUT-TABLE spells (sort -V orders 7.0 before 7.0.0).
+normalize_version() {
+	if [[ $1 =~ ^[0-9]+\.[0-9]+$ ]]; then echo "$1.0"; else echo "$1"; fi
+}
+
+sha256_of() {
+	if command -v sha256sum > /dev/null 2>&1; then
+		sha256sum "$1" | cut -c1-64
+	else
+		shasum -a 256 "$1" | cut -c1-64
+	fi
+}
+
+# Set vendored_snapshot to the snapshot directory name of the first
+# vendor/LAYOUT-TABLE range covering $1 (inclusive, compared numerically per
+# component), or leave it empty. The table is only parsed, never sourced; a
+# malformed line or an inverted range is ignored with a warning.
+find_vendored_snapshot() {
+	local wanted table first last name hash extra
+	vendored_snapshot=""
+	table="$repo_dir/vendor/LAYOUT-TABLE"
+	[ -r "$table" ] || return 0
+	wanted=$(normalize_version "$1")
+	while read -r first last name hash extra || [ -n "$first" ]; do
+		[[ -z $first || $first = \#* ]] && continue
+		if ! [[ $first =~ ^[0-9]+\.[0-9]+\.[0-9]+$ && $last =~ ^[0-9]+\.[0-9]+\.[0-9]+$ \
+			&& $name =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ && $hash =~ ^[0-9a-f]{64}$ && -z $extra ]]; then
+			echo "warning: ignoring malformed line in vendor/LAYOUT-TABLE: $first $last $name" >&2
+			continue
+		fi
+		if version_lt "$last" "$first"; then
+			echo "warning: ignoring vendor/LAYOUT-TABLE range $first $last: last is before first" >&2
+			continue
+		fi
+		if ! version_lt "$wanted" "$first" && ! version_lt "$last" "$wanted"; then
+			vendored_snapshot=$name
+			return 0
+		fi
+	done < "$table"
+	return 0
+}
+
+# Copy a vendored snapshot's sound/hda files into $hda_dir and verify each
+# against the snapshot's MANIFEST before anything uses them. Fails closed:
+# a missing MANIFEST or file, or any hash mismatch, is a hard error.
+install_vendored_snapshot() {
+	local snapshot_dir="$repo_dir/vendor/$1" manifest sum path copied=0
+	manifest="$snapshot_dir/MANIFEST"
+	if [ ! -r "$manifest" ]; then
+		echo "error: vendored snapshot $1 has no readable MANIFEST; refusing to build" >&2
+		exit 1
+	fi
+	mkdir -p "$hda_dir"
+	while read -r sum path; do
+		[[ $sum =~ ^[0-9a-f]{64}$ ]] || continue
+		if [[ $path != sound/hda/* || $path = *..* ]]; then
+			echo "error: vendored snapshot $1: unexpected MANIFEST path $path" >&2
+			exit 1
+		fi
+		path=${path#sound/hda/}
+		mkdir -p "$hda_dir/$(dirname "$path")"
+		if ! cp "$snapshot_dir/sound/hda/$path" "$hda_dir/$path" 2> /dev/null; then
+			echo "error: vendored snapshot $1: cannot copy $path" >&2
+			exit 1
+		fi
+		if [ "$(sha256_of "$hda_dir/$path")" != "$sum" ]; then
+			echo "error: vendored snapshot $1: SHA-256 mismatch for $path; refusing to build" >&2
+			exit 1
+		fi
+		copied=$((copied + 1))
+	done < "$manifest"
+	if [ "$copied" -eq 0 ]; then
+		echo "error: vendored snapshot $1: MANIFEST lists no files; refusing to build" >&2
+		exit 1
+	fi
+	# the tar extraction leaves these; the mv steps below expect them
+	mkdir -p "$hda_dir/common" "$hda_dir/codecs/cirrus"
+	: > "$hda_dir/Makefile"
+	: > "$hda_dir/common/Makefile"
+	: > "$hda_dir/codecs/Makefile"
+	: > "$hda_dir/codecs/cirrus/Makefile"
+}
+
+vendored_snapshot=""
+if [ $use_ubuntu_source -eq 0 ]; then
+	find_vendored_snapshot "$kernel_version"
+	# --dkms rebuilds unattended: a module built from a guessed base-release
+	# layout probably oopses at load (no sound at boot), whereas a failed build
+	# shows up in `dkms status`.
+	if [ $base_release_guessed -eq 1 ] && [ -z "$vendored_snapshot" ] && [ "$dkms" = true ]; then
+		echo "error: kernel $UNAME: cannot determine the upstream point release and base release $kernel_version is not vendored; refusing to build a module that may oops at load (install linux-source-$package_version or the matching linux-headers, then rebuild)" >&2
+		exit 1
+	fi
+fi
+
 if [ $use_ubuntu_source -ge 1 ]; then
 
 	tar --strip-components=2 -xvf "/usr/src/linux-source-$kernel_version.tar.bz2" --directory="$build_dir" "linux-source-$kernel_version/sound/hda"
 
+elif [ -n "$vendored_snapshot" ]; then
+
+	install_vendored_snapshot "$vendored_snapshot"
+	echo "using vendored snapshot $vendored_snapshot for kernel $kernel_version"
+
 else
+	echo "no vendored snapshot for $kernel_version; downloading from cdn.kernel.org"
 	# here we assume the distribution kernel source is essentially the mainline kernel source
 
 	set +e
