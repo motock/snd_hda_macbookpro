@@ -244,6 +244,16 @@ test_should_not_consult_table_when_ubuntu_source_package_present() {
   assert_not_contains "$HDA_INSTALLER_OUTPUT" "vendored snapshot" "table not consulted"
 }
 
+test_should_download_without_error_when_vendor_dir_absent() {
+  setup "$PLAIN" "$TABLE" || return
+  rm -rf "${HDA_SANDBOX:?}/vendor"
+  run_installer 7.0.12-1-generic
+  assert_eq 0 "$HDA_INSTALLER_RC" "exits 0 (output: $(hda_installer_output_oneline))" || return 1
+  hda_assert_shim_called wget "$CDN/linux-7.0.12.tar.xz" "downloads the tarball" || return 1
+  assert_contains "$HDA_INSTALLER_OUTPUT" "no vendored snapshot for 7.0.12; downloading from cdn.kernel.org" "prints the note" || return 1
+  assert_not_contains "$HDA_INSTALLER_OUTPUT" "LAYOUT-TABLE" "no warning about the table"
+}
+
 test_should_use_vendored_snapshot_without_download
 test_should_cover_first_version_of_range
 test_should_cover_last_version_of_range
@@ -257,5 +267,6 @@ test_should_fail_when_manifest_missing
 test_should_ignore_malformed_table_line_and_download
 test_should_ignore_range_with_last_before_first
 test_should_not_consult_table_when_ubuntu_source_package_present
+test_should_download_without_error_when_vendor_dir_absent
 
 finish
