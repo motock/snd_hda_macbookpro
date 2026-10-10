@@ -87,3 +87,14 @@ Hardware validation: nothing in the cleanup (HDA-20 unsolicited-event lock, HDA-
 installer changes) or the Linux 7.0 work has been run on an iMac.  The cs8409 patches apply to Linux 6.17,
 7.0, 7.1 and 7.2, and the module has been built against 7.0 on x86-64; audio, jack events and suspend/resume are
 unverified.
+
+Hardware result, 2026-10-10: the driver, built from the linux-7.0.14 mainline sound/hda sources, was installed on
+an iMac18,2 (i5-7400) running Ubuntu 7.0.0-38-generic (upstream 7.0.14) and sound output works.  NOT checked on
+that run: jack/headset events, the internal microphone, suspend/resume.  The caveats above still apply to those.
+
+The failure that preceded it: a module built from base linux-7.0 sources oopsed at probe (UBSAN
+array-index-out-of-bounds in generic.c fill_input_pin_labels, then a general protection fault in strcmp).
+Cause: upstream v7.0.10 added share_spdif_kctl to struct hda_multi_out in hda_local.h, which shifts hda_gen_spec
+by 8 bytes, so a module built from older sources reads the wrong offsets.  The installer now picks the point
+release from /proc/version_signature.  Proof: a throwaway module printing sizeof(struct hda_gen_spec) gave 6000
+against the kernel's 6008 (pahole on /sys/kernel/btf/snd_hda_codec_generic).
