@@ -1,0 +1,14 @@
+# vendor/LAYOUT-TABLE -- which vendored snapshot matches which kernel releases.
+#
+# Fields: <first-version> <last-version> <snapshot-dir-name> <layout-hash>
+# A range is inclusive and stays inside one major.minor series.  <layout-hash>
+# is tools/layout-hash.sh over the include closure of cs8409; every release in
+# the range hashes to it (checked per release against git.kernel.org's stable
+# tags v6.17 .. v6.17.13, v7.0 .. v7.0.14, v7.1 .. v7.1.13).
+#
+# 7.0.10 added a field to struct hda_multi_out, so 7.0 splits in two.  The
+# 7.0.10+ layout is identical to 7.1.x, but ranges never cross a series.
+6.17.0 6.17.13 linux-6.17.13 333257d5cade86f4fbb35a0feb653b33b3958609cbc047b57a3dd35298c33a2c
+7.0.0 7.0.9 linux-7.0 e7613f959fac5533343c3b22d2b47ce822af72748cd0c974002ef7fc871a79d9
+7.0.10 7.0.14 linux-7.0.14 de837d848a37424c6298916d3571326215d2b6ce616c0c44595614290d6f528d
+7.1.0 7.1.13 linux-7.1.13 de837d848a37424c6298916d3571326215d2b6ce616c0c44595614290d6f528d
