@@ -73,6 +73,16 @@ patch_cirrus_real84.h depend on it, three with mask 0 whose only effect is that 
 `| (coef & mask)` form was not applied for the same reason; tests/test_driver_coef_mask.sh pins the current
 behaviour.
 
+CI warning cleanup - unused-symbol warnings in patch_cirrus_real84.h (18 unused-function, 21 unused-variable per
+pinned kernel) and patch_cirrus_real84_i2c.h (11 and 4) are still in tests/ci/build-warning-baseline.*.txt.  Stories
+CI-WARN-REAL84 and CI-WARN-REAL84-I2C are parked, for two reasons.  (1) tests/test_spdx_batch3.sh check C9 diffs both
+headers against the commit before that test was added and requires exactly one added line (the SPDX comment), so any
+later edit to either file fails the suite; C9 must be changed to compare against the commit that added the SPDX line
+before these files can be cleaned.  (2) The agents run on macOS and cannot build cs8409.o to measure before/after
+counts, and the edits are deletions in a driver that cannot be tested on hardware here.  The ratchet still blocks any
+increase.  Redo them when C9 is fixed and a Linux build environment is available, lowering the baselines to the
+measured counts.
+
 Hardware validation: nothing in the cleanup (HDA-20 unsolicited-event lock, HDA-39 include move, the real84.h and
 installer changes) or the Linux 7.0 work has been run on an iMac.  The cs8409 patches apply to Linux 6.17,
 7.0, 7.1 and 7.2, and the module has been built against 7.0 on x86-64; audio, jack events and suspend/resume are
