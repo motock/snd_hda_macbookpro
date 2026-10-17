@@ -190,8 +190,9 @@ patch applies with fuzz.
 * Verified on hardware: an iMac 2017 (iMac18,2) running Ubuntu 24.04 with the 7.0.0-38 HWE kernel
   (upstream 7.0.14). The built-in speakers and the headphone output work. The microphone did not
   work in that test (I do not know whether it worked under macOS), and suspend/resume has not been
-  tested. No other 7.x kernel or Mac model has been tested. A successful build alone says nothing
-  about whether sound works.
+  tested. This was confirmed both with the installer script and with the v0.2.0 dkms package. No
+  other 7.x kernel or Mac model has been tested. A successful build alone says nothing about whether
+  sound works.
 
 CI
 -------------
@@ -309,9 +310,11 @@ dkms status
 `dkms status` should list `snd_hda_macbookpro/<version>` as installed for your running kernel.
 Remove it with `sudo apt remove snd-hda-macbookpro-dkms`.
 
-This package is verified only on an iMac18,2 (iMac 2017) with Ubuntu kernel 7.0.0-38. Kernels
-without a vendored snapshot make dkms download the kernel source, so the build needs network access
-there. No other Mac or kernel is claimed to work.
+This package is verified only on an iMac18,2 (iMac 2017) with Ubuntu kernel 7.0.0-38: installing the
+v0.2.0 package there built the module through dkms and sound output works. A rebuild triggered by a
+real kernel upgrade has not been tested yet. Kernels without a vendored snapshot make dkms download
+the kernel source, so the build needs network access there. No other Mac or kernel is claimed to
+work.
 
 **installer options**
 
